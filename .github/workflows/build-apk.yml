@@ -105,20 +105,12 @@ jobs:
         run: |
           LOG=../build.log
           if [ -f "$LOG" ]; then
-            echo "::group::Full Gradle output (last 100 lines)"
-            tail -100 "$LOG"
-            echo "::endgroup::"
-            # 提取真正的错误行 — Kotlin 编译器错误以 e: 开头
-            echo "::group::Kotlin compilation errors"
-            grep -E '^e:|error:|Unresolved |FAILURE:|What went wrong|Cause:|\.kt:' "$LOG" 2>/dev/null || echo "(none found)"
-            echo "::endgroup::"
-            # Step summary
-            {
-              echo "### ⛔ Gradle build failed"
-              echo '```'
-              tail -50 "$LOG"
-              echo '```'
-            } >> $GITHUB_STEP_SUMMARY
+            # 把全部日志逐行输出为 ::error:: annotation
+            while IFS= read -r line; do
+              if [ -n "$line" ]; then
+                echo "::error title=Gradle::$line"
+              fi
+            done < <(tail -80 "$LOG")
           else
             echo "::error::build.log not found"
           fi
