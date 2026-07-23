@@ -42,20 +42,39 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-home-cache-cleanup: true
+          cache-read-only: false
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Debug — print environment
+      - name: Set up Android SDK & local.properties
         shell: bash
         run: |
+          SDK=/usr/local/lib/android/sdk
+          if [ -d "$SDK" ]; then
+            echo "ANDROID_HOME=$SDK" >> $GITHUB_ENV
+            echo "ANDROID_SDK_ROOT=$SDK" >> $GITHUB_ENV
+            echo "sdk.dir=$SDK" > local.properties
+            echo "local.properties created => sdk.dir=$SDK"
+            # Accept licenses
+            yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses 2>/dev/null || true
+          else
+            echo "SDK not found at $SDK, checking alternatives..."
+            ls /usr/local/lib/android/ 2>/dev/null || echo "No android dir"
+            echo "$ANDROID_HOME" >&2
+          fi
+          echo "--- Android SDK status ---"
           echo "ANDROID_HOME=${ANDROID_HOME:-<unset>}"
           echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-<unset>}"
           echo "JAVA_HOME=${JAVA_HOME}"
-          java -version 2>&1 | head -3
-          ls -la /usr/local/lib/android/sdk/ 2>/dev/null || echo "SDK dir not found"
-          ls /usr/local/lib/android/sdk/platforms/ 2>/dev/null || echo "No platforms dir"
-          ls /usr/local/lib/android/sdk/build-tools/ 2>/dev/null || echo "No build-tools dir"
+          ls -la "$SDK/platforms/" 2>/dev/null || echo "No platforms dir"
+          ls -la "$SDK/build-tools/" 2>/dev/null || echo "No build-tools dir"
+          echo "--- Searching for Android SDK anywhere ---"
+          find / -maxdepth 4 -name "platforms" -type d 2>/dev/null | head -5
+          echo "--- ANDROID_HOME in env ---"
+          env | grep -i android | head -10 || echo "No Android env vars"
+          echo "--- ubuntu version ---"
+          cat /etc/os-release | head -5 || true
 
       - name: Decode keystore (if available)
         id: keystore
@@ -75,13 +94,10 @@ jobs:
       - name: Build Debug APK
         shell: bash
         run: |
-          ./gradlew assembleDebug --stacktrace 2>&1 | tee gradle.log
-          # 如果失败，把最后 100 行输出到 summary
-          if [ $? -ne 0 ]; then
-            echo "### ⛔ Gradle build failed — last 100 lines" >> $GITHUB_STEP_SUMMARY
-            tail -100 gradle.log >> $GITHUB_STEP_SUMMARY
+          ./gradlew assembleDebug --stacktrace 2>&1 || {
+            echo "### ⛔ Gradle build failed" >> $GITHUB_STEP_SUMMARY
             exit 1
-          fi
+          }
 
       - name: Build Release APK (if keystore configured)
         if: steps.keystore.outputs.has_keystore == 'true'
