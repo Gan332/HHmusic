@@ -47,34 +47,8 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Set up Android SDK & local.properties
-        shell: bash
-        run: |
-          SDK=/usr/local/lib/android/sdk
-          if [ -d "$SDK" ]; then
-            echo "ANDROID_HOME=$SDK" >> $GITHUB_ENV
-            echo "ANDROID_SDK_ROOT=$SDK" >> $GITHUB_ENV
-            echo "sdk.dir=$SDK" > local.properties
-            echo "local.properties created => sdk.dir=$SDK"
-            # Accept licenses
-            yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses 2>/dev/null || true
-          else
-            echo "SDK not found at $SDK, checking alternatives..."
-            ls /usr/local/lib/android/ 2>/dev/null || echo "No android dir"
-            echo "$ANDROID_HOME" >&2
-          fi
-          echo "--- Android SDK status ---"
-          echo "ANDROID_HOME=${ANDROID_HOME:-<unset>}"
-          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-<unset>}"
-          echo "JAVA_HOME=${JAVA_HOME}"
-          ls -la "$SDK/platforms/" 2>/dev/null || echo "No platforms dir"
-          ls -la "$SDK/build-tools/" 2>/dev/null || echo "No build-tools dir"
-          echo "--- Searching for Android SDK anywhere ---"
-          find / -maxdepth 4 -name "platforms" -type d 2>/dev/null | head -5
-          echo "--- ANDROID_HOME in env ---"
-          env | grep -i android | head -10 || echo "No Android env vars"
-          echo "--- ubuntu version ---"
-          cat /etc/os-release | head -5 || true
+      - name: Set up Android SDK
+        uses: malinskiy/action-android@8fb38da9312e5ebe030d0cdd0a1f8b2acd5e83f6
 
       - name: Decode keystore (if available)
         id: keystore
