@@ -48,7 +48,33 @@ jobs:
         run: chmod +x gradlew
 
       - name: Set up Android SDK
-        uses: malinskiy/action-android@8fb38da9312e5ebe030d0cdd0a1f8b2acd5e83f6
+        shell: bash
+        run: |
+          CWD=$(pwd)  # should be android/
+          SDK_ROOT=/usr/local/lib/android/sdk
+          if [ ! -d "$SDK_ROOT" ]; then
+            SDK_ROOT=$HOME/android-sdk
+            echo "Pre-installed SDK not found, downloading to $SDK_ROOT ..."
+            mkdir -p "$SDK_ROOT"
+            CMDLINE_URL=$(curl -sL "https://developer.android.com/studio#command-line-tools-only" 2>/dev/null | grep -oP 'commandlinetools-linux-[0-9]+_latest\.zip' | head -1 || true)
+            if [ -z "$CMDLINE_URL" ]; then
+              CMDLINE_URL="commandlinetools-linux-11076708_latest.zip"
+            fi
+            curl -sL -o "$SDK_ROOT/cmdline-tools.zip" "https://dl.google.com/android/repository/$CMDLINE_URL"
+            unzip -q "$SDK_ROOT/cmdline-tools.zip" -d "$SDK_ROOT/cmdline-tools"
+            mv "$SDK_ROOT/cmdline-tools/cmdline-tools" "$SDK_ROOT/cmdline-tools/latest"
+            rm -f "$SDK_ROOT/cmdline-tools.zip"
+            # 接受许可并安装 platform 34
+            yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses --sdk_root=$SDK_ROOT > /dev/null 2>&1 || true
+            yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;34.0.0" --sdk_root=$SDK_ROOT > /dev/null 2>&1 || true
+          else
+            echo "Using pre-installed SDK at $SDK_ROOT"
+          fi
+          echo "ANDROID_HOME=$SDK_ROOT" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> $GITHUB_ENV
+          echo "sdk.dir=$SDK_ROOT" > "$CWD/local.properties"
+          echo "local.properties written: sdk.dir=$SDK_ROOT"
+          echo "SDK setup done"
 
       - name: Decode keystore (if available)
         id: keystore
