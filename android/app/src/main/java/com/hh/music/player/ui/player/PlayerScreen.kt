@@ -93,7 +93,7 @@ fun PlayerScreen(
                     )
                 }
                 // Favorite toggle
-                IconButton(onClick = { song?.let { store.toggleFavorite(it) } }) {
+                IconButton(onClick = { song?.let { scope.launch { store.toggleFavorite(it) } } }) {
                     Icon(
                         if (isFav) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                         contentDescription = "收藏",

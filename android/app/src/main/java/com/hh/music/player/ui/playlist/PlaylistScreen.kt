@@ -19,6 +19,7 @@ import com.hh.music.player.ui.LocalPlayerController
 import com.hh.music.player.ui.LocalStoreProvider
 import com.hh.music.player.ui.components.MiniPlayerBar
 import com.hh.music.player.ui.components.SongRow
+import kotlinx.coroutines.launch
 
 @Composable
 fun PlaylistScreen(
@@ -38,6 +39,7 @@ fun PlaylistScreen(
     val savedPlaylists by store.savedPlaylists.collectAsState(initial = emptyList())
     val playlist = state.playlist
     val isSaved = savedPlaylists.any { it.id == playlistId }
+    val scope = rememberCoroutineScope()
 
     fun playFrom(index: Int) {
         val list = playlist?.tracks ?: return
@@ -56,14 +58,15 @@ fun PlaylistScreen(
                 actions = {
                     IconButton(onClick = {
                         playlist?.let {
-                            store.toggleSavedPlaylist(
+                            scope.launch {
+                                store.toggleSavedPlaylist(
                                 SavedPlaylist(
                                     id = it.id,
                                     name = it.name,
                                     coverUrl = it.coverImgUrl ?: "",
                                     creator = it.creator?.nickname ?: ""
                                 )
-                            )
+                            })
                         }
                     }) {
                         Icon(
