@@ -47,6 +47,9 @@ jobs:
         with:
           gradle-home-cache-cleanup: true
 
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
       - name: Decode keystore (if available)
         id: keystore
         shell: bash
