@@ -154,8 +154,10 @@ jobs:
           if-no-files-found: ignore
 
       - name: Create Release on tag
-        if: success() && startsWith(github.ref, 'refs/tags/v') && steps.keystore.outputs.has_keystore == 'true'
+        if: success() && startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: android/app/build/outputs/apk/release/*.apk
+          files: |
+            android/app/build/outputs/apk/debug/*.apk
+            android/app/build/outputs/apk/release/*.apk
           generate_release_notes: true
