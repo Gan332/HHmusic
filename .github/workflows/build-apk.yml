@@ -109,15 +109,22 @@ jobs:
         run: |
           LOG=../build.log
           if [ -f "$LOG" ]; then
-            # 把全部日志逐行输出为 ::error:: annotation
-            while IFS= read -r line; do
-              if [ -n "$line" ]; then
-                echo "::error title=Gradle::$line"
-              fi
-            done < <(tail -80 "$LOG")
+            # Output error & warning lines as annotations
+            grep -n -i 'error:\|warning:\|FAILURE:\|Unresolved reference\|Type mismatch\|expecting\|\.kt:' "$LOG" | head -60 | while IFS=: read -r nr line; do
+              echo "::error title=Gradle(line $nr)::$(echo "$line" | sed 's/[]"<>[]/ /g')"
+            done
+            # If no specific errors found, show first 40 lines
+            if ! grep -q -i 'error:\|FAILURE:' "$LOG"; then
+              head -40 "$LOG" | while IFS= read -r line; do
+                [ -n "$line" ] && echo "::error title=Gradle::$(echo "$line" | sed 's/[]"<>[]/ /g')"
+              done
+            fi
           else
             echo "::error::build.log not found"
           fi
+          # Also show last 10 lines for context
+          echo "--- last 10 lines ---"
+          tail -10 "$LOG"
           exit 1
 
       - name: Upload build logs (always)
