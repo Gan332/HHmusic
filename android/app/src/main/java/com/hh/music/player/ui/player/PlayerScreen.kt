@@ -41,6 +41,7 @@ fun PlayerScreen(
     val queue by player.queue.collectAsState()
     val playMode by player.playMode.collectAsState()
     val lyricState by vm.state.collectAsState()
+    val scope = rememberCoroutineScope()
 
     // Favorites snapshot for the heart toggle
     val favorites by store.favorites.collectAsState(initial = emptyList())

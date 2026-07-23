@@ -112,7 +112,6 @@ fun HHMusicNavHost(container: AppContainer) {
                 composable(Routes.TOPLIST) {
                     ToplistScreen(
                         repository = container.repository,
-                        onBack = { navController.popBackStack() },
                         onPlaylistClick = { id -> navController.navigate(Routes.playlist(id)) }
                     )
                 }
