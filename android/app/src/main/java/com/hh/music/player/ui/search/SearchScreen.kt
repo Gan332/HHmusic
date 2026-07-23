@@ -27,13 +27,14 @@ import com.hh.music.player.ui.components.SongRow
 fun SearchScreen(
     repository: MusicRepository,
     onOpenPlayer: () -> Unit,
-    vm: SearchViewModel = viewModel { SearchViewModel(repository, store) }
+    vm: SearchViewModel? = null
 ) {
-    val state by vm.state.collectAsState()
+    val store = LocalStoreProvider.current
+    val actualVm = vm ?: viewModel { SearchViewModel(repository, store) }
+    val state by actualVm.state.collectAsState()
     val player = LocalPlayerController.current
     val currentSong by player.currentSong.collectAsState()
     val isPlaying by player.isPlaying.collectAsState()
-    val store = LocalStoreProvider.current
     val history by store.searchHistory.collectAsState(initial = emptyList())
 
     fun playFrom(index: Int) {
@@ -52,12 +53,12 @@ fun SearchScreen(
                 )
                 OutlinedTextField(
                     value = state.query,
-                    onValueChange = vm::onQueryChange,
+                    onValueChange = actualVm::onQueryChange,
                     placeholder = { Text("搜索歌曲、歌手") },
                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                     trailingIcon = {
                         if (state.query.isNotEmpty()) {
-                            IconButton(onClick = { vm.onQueryChange("") }) {
+                            IconButton(onClick = { actualVm.onQueryChange("") }) {
                                 Icon(Icons.Filled.Close, contentDescription = "清空")
                             }
                         }
@@ -87,8 +88,8 @@ fun SearchScreen(
                     // Search history section
                     SearchHistorySection(
                         history = history,
-                        onPick = { kw -> vm.onQueryChange(kw); vm.submitSearch(kw) },
-                        onClear = { vm.clearHistory() }
+                        onPick = { kw -> actualVm.onQueryChange(kw); actualVm.submitSearch(kw) },
+                        onClear = { actualVm.clearHistory() }
                     )
                 }
                 state.results.isEmpty() -> Text(
