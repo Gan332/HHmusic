@@ -103,14 +103,20 @@ jobs:
         if: steps.build.outcome == 'failure'
         shell: bash
         run: |
-          echo "::group::Gradle build error (last 200 lines)"
-          tail -200 ../build.log 2>/dev/null || echo "No build.log found"
-          echo "::endgroup::"
-          # Also dump to step summary
-          echo "### ⛔ Gradle build failed" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -100 ../build.log 2>/dev/null >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          LOG=../build.log
+          if [ -f "$LOG" ]; then
+            # 将 Gradle 错误逐行输出为 ::error:: annotation
+            while IFS= read -r line; do
+              echo "::error file=android/,title=Gradle Error::$line"
+            done < <(grep -i "error\|FAILED\|Exception\|^>" "$LOG" 2>/dev/null | tail -50)
+            # 也输出最后 30 行到 summary
+            echo "### ⛔ Gradle build failed (last 30 lines)" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -30 "$LOG" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "::error::build.log not found"
+          fi
           exit 1
 
       - name: Upload build logs (always)
