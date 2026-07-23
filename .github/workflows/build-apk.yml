@@ -105,15 +105,20 @@ jobs:
         run: |
           LOG=../build.log
           if [ -f "$LOG" ]; then
-            # 将 Gradle 错误逐行输出为 ::error:: annotation
-            while IFS= read -r line; do
-              echo "::error file=android/,title=Gradle Error::$line"
-            done < <(grep -i "error\|FAILED\|Exception\|^>" "$LOG" 2>/dev/null | tail -50)
-            # 也输出最后 30 行到 summary
-            echo "### ⛔ Gradle build failed (last 30 lines)" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            tail -30 "$LOG" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "::group::Full Gradle output (last 100 lines)"
+            tail -100 "$LOG"
+            echo "::endgroup::"
+            # 提取真正的错误行 — Kotlin 编译器错误以 e: 开头
+            echo "::group::Kotlin compilation errors"
+            grep -E '^e:|error:|Unresolved |FAILURE:|What went wrong|Cause:|\.kt:' "$LOG" 2>/dev/null || echo "(none found)"
+            echo "::endgroup::"
+            # Step summary
+            {
+              echo "### ⛔ Gradle build failed"
+              echo '```'
+              tail -50 "$LOG"
+              echo '```'
+            } >> $GITHUB_STEP_SUMMARY
           else
             echo "::error::build.log not found"
           fi
