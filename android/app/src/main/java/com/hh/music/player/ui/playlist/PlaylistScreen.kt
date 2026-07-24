@@ -21,6 +21,7 @@ import com.hh.music.player.ui.components.MiniPlayerBar
 import com.hh.music.player.ui.components.SongRow
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlaylistScreen(
     playlistId: Long,
@@ -57,16 +58,16 @@ fun PlaylistScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-                        playlist?.let {
-                            scope.launch {
-                                store.toggleSavedPlaylist(
+                        val p = playlist ?: return@IconButton
+                        scope.launch {
+                            store.toggleSavedPlaylist(
                                 SavedPlaylist(
-                                    id = it.id,
-                                    name = it.name,
-                                    coverUrl = it.coverImgUrl ?: "",
-                                    creator = it.creator?.nickname ?: ""
+                                    id = p.id,
+                                    name = p.name,
+                                    coverUrl = p.coverImgUrl ?: "",
+                                    creator = p.creator?.nickname ?: ""
                                 )
-                            })
+                            )
                         }
                     }) {
                         Icon(
