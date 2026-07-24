@@ -17,3 +17,6 @@ pid.txt
 # Keystore
 *.jks
 *.keystore
+
+# reference clone (tmp)
+_ncrust_ref/

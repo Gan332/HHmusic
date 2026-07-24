@@ -1,16 +1,20 @@
 # HH音乐 · 网易云第三方音乐播放器（Android）
 
-一个基于网易云接口的第三方音乐播放器，由两部分组成：
+一个基于网易云接口的第三方音乐播放器。
 
-- `server/` — Node.js / Express 后端代理，封装网易云 weapi 加密签名与接口，统一输出干净的 JSON。
-- `android/` — 原生 Android 客户端（Kotlin + Jetpack Compose + Media3/ExoPlayer）。
+> **v1.2 起：App 直连网易云，无需本机后端。** 客户端内置 eapi 加密（移植自 [GuitaristRin/Ncrust](https://github.com/GuitaristRin/Ncrust)），直接访问 `music.163.com`；歌曲地址还有公开「outer url」兜底，连 cookie 都不用登录即可播大量歌曲。`server/` 仅作可选的传统 weapi 代理保留。
 
 ```
-┌─────────────────┐      HTTP/JSON      ┌──────────────────┐     weapi 加密     ┌─────────────────┐
-│  Android App    │ ───────────────────▶│  Node 代理 server │ ──────────────────▶│  网易云 music.163 │
-│  Compose/ExoPlayer│◀──────────────────│  (Express)       │◀──────────────────│                 │
-└─────────────────┘                     └──────────────────┘                    └─────────────────┘
+┌─────────────────┐   eapi加密/直连https    ┌─────────────────┐
+│   Android App   │ ───────────────────────▶│  网易云 music.163│
+│ Compose/ExoPlayer│◀───────────────────────│                 │
+└─────────────────┘                         └─────────────────┘
+        (无需本机后端；server/ 为可选)
 ```
+
+组件：
+- `android/` — 原生 Android 客户端（Kotlin + Jetpack Compose + Media3/ExoPlayer），内置 eapi 直连。
+- `server/` — Node.js/Express 后端代理（可选，weapi 签名，统一 JSON），历史保留。
 
 ## 功能
 
@@ -22,9 +26,9 @@
 - 🎚 通知栏 / MediaSession 控制（锁屏可控）
 - 🎨 仿网易云深色绿色主题
 
-## 一、启动后端（必需）
+## 一、（可选）启动后端代理
 
-后端服务负责向网易云发起 weapi 签名请求，并给 App 提供干净 JSON。
+> **默认无需启动。** v1.2 起 App 直连网易云。仅当你想用后端走 weapi 代理时，才启动它，并把 `MusicRepository.USE_BACKEND` 改为 `true`。
 
 ```bash
 cd server
@@ -50,20 +54,11 @@ curl http://localhost:3000/api/health
 | `GET /api/toplist` | 排行榜列表 |
 | `POST /api/song/like`        body `{"id":123,"like":true}` | 喜欢歌曲 |
 
-## 二、运行 Android 客户端
+## 二、运行 Android 客户端（开箱即用，无需后端）
 
-### 1. 配置后端地址
+App 直连网易云，装上即用。可选：登录后可播 VIP 曲目 —— 在 `DirectNcmClient.setCookie(\"MUSIC_U=...\")` 注入 cookie。
 
-App 默认通过 Android 模拟器访问宿主机：
-
-```kotlin
-// android/app/src/main/java/com/hh/music/player/network/NetworkModule.kt
-const val BASE_URL = "http://10.0.2.2:3000/api/"
-```
-
-- **模拟器**：保持 `10.0.2.2:3000` 即可（自动映射到电脑 localhost）。
-- **真机**：改为电脑局域网 IP，例如 `http://192.168.1.100:3000/api/`，并确保手机与电脑同网段。
-
+> 后端方案见第一节（可选）。默认 `MusicRepository.USE_BACKEND=false`。
 ### 2. 用 Android Studio 打开并运行
 
 1. 打开 Android Studio → `Open` → 选择 `D:\HHmusic\android` 目录。
