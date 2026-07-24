@@ -1,0 +1,6 @@
+{
+  "plugin": [
+    "opencode-visual-cache@latest"
+  ],
+  "lsp": true
+}
