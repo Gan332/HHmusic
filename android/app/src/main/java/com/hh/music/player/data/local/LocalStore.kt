@@ -6,12 +6,14 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.hh.music.player.data.SavedPlaylist
 import com.hh.music.player.data.Song
 import com.hh.music.player.data.ToplistItem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.serializer
 
 /** DataStore for user-local collections: favorites, recently played, search history. */
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "hhmusic_store")
@@ -38,7 +40,7 @@ class LocalStore(private val context: Context) {
     // ---- Search history (strings) ----
     private val historyKey = stringPreferencesKey("search_history")
     val searchHistory: Flow<List<String>> = context.dataStore.data.map { p ->
-        p[historyKey]?.let { runCatching { json.decodeFromString(ListSerializer(kotlinx.serialization.builtins.serializer<String>()), it) }.getOrNull() } ?: emptyList()
+        p[historyKey]?.let { runCatching { json.decodeFromString(ListSerializer(serializer<String>()), it) }.getOrNull() } ?: emptyList()
     }
 
     // ---- Saved playlists (as ToplistItem-like entries) ----
@@ -77,14 +79,14 @@ class LocalStore(private val context: Context) {
         val k = keyword.trim()
         if (k.isBlank()) return
         context.dataStore.edit { p ->
-            val cur = p[historyKey]?.let { runCatching { json.decodeFromString(ListSerializer(kotlinx.serialization.builtins.serializer<String>()), it) }.getOrNull() } ?: emptyList()
+            val cur = p[historyKey]?.let { runCatching { json.decodeFromString(ListSerializer(serializer<String>()), it) }.getOrNull() } ?: emptyList()
             val next = (listOf(k) + cur.filter { it != k }).take(20)
-            p[historyKey] = json.encodeToString(ListSerializer(kotlinx.serialization.builtins.serializer<String>()), next)
+            p[historyKey] = json.encodeToString(ListSerializer(serializer<String>()), next)
         }
     }
 
     suspend fun clearSearchHistory() {
-        context.dataStore.edit { it[historyKey] = json.encodeToString(ListSerializer(kotlinx.serialization.builtins.serializer<String>()), emptyList()) }
+        context.dataStore.edit { it[historyKey] = json.encodeToString(ListSerializer(serializer<String>()), emptyList()) }
     }
 
     suspend fun toggleSavedPlaylist(playlist: SavedPlaylist) {
