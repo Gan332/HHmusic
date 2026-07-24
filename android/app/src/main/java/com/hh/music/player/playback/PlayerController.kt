@@ -212,12 +212,9 @@ class PlayerController(
             if (url.isNullOrBlank()) return@launch
             val c = controller ?: return@launch
             val idx = c.currentMediaItemIndex
-            val items = c.currentMediaItems
-            if (idx !in items.indices) return@launch
+            if (idx == -1) return@launch
             val updated = song.toMediaItem(url)
-            val newItems = items.toMutableList().apply { this[idx] = updated }
-            val pos = c.currentPosition
-            c.setMediaItems(newItems, idx, pos)
+            c.replaceMediaItem(idx, updated)
             applyPlayModeToPlayer()
             c.prepare()
             c.playWhenReady = true

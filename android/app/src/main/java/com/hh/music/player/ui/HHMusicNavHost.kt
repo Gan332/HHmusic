@@ -2,7 +2,7 @@ package com.hh.music.player.ui
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Search
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.Person
@@ -56,7 +56,7 @@ fun HHMusicNavHost(container: AppContainer) {
     val navController: NavHostController = rememberNavController()
     val tabs = listOf(
         TabItem(Routes.DISCOVER, "发现") { Icon(Icons.Filled.Explore, contentDescription = null) },
-        TabItem(Routes.SEARCH, "搜索") { Icon(Icons.AutoMirrored.Filled.Search, contentDescription = null) },
+        TabItem(Routes.SEARCH, "搜索") { Icon(Icons.Filled.Search, contentDescription = null) },
         TabItem(Routes.TOPLIST, "排行榜") { Icon(Icons.Filled.Leaderboard, contentDescription = null) },
         TabItem(Routes.MINE, "我的") { Icon(Icons.Filled.Person, contentDescription = null) }
     )
