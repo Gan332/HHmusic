@@ -190,3 +190,23 @@ jobs:
             android/app/build/outputs/apk/debug/*.apk
             android/app/build/outputs/apk/release/*.apk
           generate_release_notes: true
+
+      - name: Publish Debug APK to continuous release
+        if: success() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          TAG="continuous"
+          REPO="${{ github.repository }}"
+          APK="android/app/build/outputs/apk/debug/*.apk"
+
+          # Delete existing continuous release & tag (ignore errors if none)
+          gh release delete "$TAG" --repo "$REPO" --cleanup-tag --yes 2>/dev/null || true
+
+          # Create new continuous release
+          gh release create "$TAG" \
+            --repo "$REPO" \
+            --title "最新构建 (${{ github.sha }})" \
+            --notes "Commit: ${{ github.sha }}\n构建时间: $(date -u '+%Y-%m-%d %H:%M UTC')" \
+            --prerelease $APK
