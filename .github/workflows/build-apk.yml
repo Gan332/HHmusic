@@ -9,11 +9,11 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, Dev ]
     tags:
       - 'v*'
   pull_request:
-    branches: [ main ]
+    branches: [ main, Dev ]
     paths:
       - 'android/**'
   workflow_dispatch:
