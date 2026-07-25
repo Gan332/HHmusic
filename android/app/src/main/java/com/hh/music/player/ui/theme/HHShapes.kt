@@ -5,6 +5,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.dp
 
 /**
  * HH Music shape system — consistent rounded corners inspired by SaltUI.

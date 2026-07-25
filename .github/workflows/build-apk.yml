@@ -200,7 +200,7 @@ jobs:
         run: |
           TAG="continuous"
           REPO="${{ github.repository }}"
-          APK="android/app/build/outputs/apk/debug/*.apk"
+          APK="app/build/outputs/apk/debug/*.apk"
 
           # Delete existing continuous release & tag (ignore errors if none)
           gh release delete "$TAG" --repo "$REPO" --cleanup-tag --yes 2>/dev/null || true
