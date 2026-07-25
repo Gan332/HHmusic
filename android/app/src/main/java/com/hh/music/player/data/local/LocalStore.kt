@@ -54,6 +54,8 @@ class LocalStore(private val context: Context) {
     private val playModeKey = stringPreferencesKey("play_mode")
     // ---- Settings: direct vs backend, default audio quality ----
     private val useBackendKey = booleanPreferencesKey("use_backend")
+    private val isDarkThemeKey = booleanPreferencesKey("is_dark_theme")
+    val isDarkTheme: Flow<Boolean> = context.dataStore.data.map { it[isDarkThemeKey] ?: false }
     val useBackend: Flow<Boolean> = context.dataStore.data.map { it[useBackendKey] ?: false }
     private val audioQualityKey = stringPreferencesKey("audio_quality")
     val audioQuality: Flow<String> = context.dataStore.data.map { it[audioQualityKey] ?: "exhigh" }
@@ -104,6 +106,7 @@ class LocalStore(private val context: Context) {
     }
 
     suspend fun setUseBackend(value: Boolean) { context.dataStore.edit { it[useBackendKey] = value } }
+    suspend fun setIsDarkTheme(value: Boolean) { context.dataStore.edit { it[isDarkThemeKey] = value } }
     suspend fun setAudioQuality(value: String) { context.dataStore.edit { it[audioQualityKey] = value } }
     suspend fun setPlayMode(mode: String) {
         context.dataStore.edit { it[playModeKey] = mode }

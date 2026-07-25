@@ -18,12 +18,15 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            HHMusicTheme {
+            val app = application as HHMusicApp
+            val store = app.container.localStore
+            val isDarkTheme by store.isDarkTheme.collectAsState(initial = false)
+
+            HHMusicTheme(isDarkTheme = isDarkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val app = application as HHMusicApp
                     HHMusicNavHost(app.container)
                 }
             }

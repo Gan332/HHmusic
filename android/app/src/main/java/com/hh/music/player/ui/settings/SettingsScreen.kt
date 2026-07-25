@@ -31,6 +31,7 @@ fun SettingsScreen(
 ) {
     val useBackend by vm.useBackend.collectAsState()
     val quality by vm.audioQuality.collectAsState()
+    val isDarkTheme by vm.isDarkTheme.collectAsState()
     var qualityMenuOpen by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -107,8 +108,22 @@ fun SettingsScreen(
                     }
                 }
             }
+            // ---- 主题 ----
+            Spacer(Modifier.height(8.dp))
+            SectionLabel("主题")
+            Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.medium) {
+                Row(
+                    Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("深色模式", fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                        Text("切换深色/浅色外观", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = isDarkTheme, onCheckedChange = { vm.setIsDarkTheme(it) })
+                }
+            }
 
-            // ---- 关于 ----
             Spacer(Modifier.height(8.dp))
             SectionLabel("关于")
             Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.medium) {

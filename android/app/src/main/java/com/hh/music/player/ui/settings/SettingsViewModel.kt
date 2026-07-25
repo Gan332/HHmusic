@@ -11,8 +11,10 @@ import kotlinx.coroutines.launch
 data class SettingsState(
     val useBackend: Boolean = false,
     val audioQuality: String = "exhigh",
+    val isDarkTheme: Boolean = false,
     val aboutVersion: String = "1.3"
 )
+
 
 class SettingsViewModel(private val store: LocalStore) : ViewModel() {
 
@@ -22,6 +24,10 @@ class SettingsViewModel(private val store: LocalStore) : ViewModel() {
     val audioQuality: StateFlow<String> =
         store.audioQuality.stateIn(viewModelScope, SharingStarted.Eagerly, "exhigh")
 
+    val isDarkTheme: StateFlow<Boolean> =
+        store.isDarkTheme.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     fun setUseBackend(value: Boolean) { viewModelScope.launch { store.setUseBackend(value) } }
     fun setAudioQuality(value: String) { viewModelScope.launch { store.setAudioQuality(value) } }
+    fun setIsDarkTheme(value: Boolean) { viewModelScope.launch { store.setIsDarkTheme(value) } }
 }

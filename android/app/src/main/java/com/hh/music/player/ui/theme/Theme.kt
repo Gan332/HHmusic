@@ -1,37 +1,83 @@
 package com.hh.music.player.ui.theme
 
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-// NetEase-inspired dark palette with a green accent.
-private val Green500 = Color(0xFF1DB954)
-private val Green700 = Color(0xFF168A3D)
-private val DarkBg = Color(0xFF0F0F0F)
-private val DarkSurface = Color(0xFF1C1C1C)
-private val DarkSurfaceVariant = Color(0xFF2A2A2A)
-private val LightText = Color(0xFFFFFFFF)
-private val MutedText = Color(0xFFB3B3B3)
-
-private val HHColorScheme = darkColorScheme(
-    primary = Green500,
-    onPrimary = Color.Black,
-    primaryContainer = Green700,
-    secondary = Green500,
-    background = DarkBg,
-    onBackground = LightText,
-    surface = DarkSurface,
-    onSurface = LightText,
-    surfaceVariant = DarkSurfaceVariant,
-    onSurfaceVariant = MutedText,
-)
-
+/**
+ * HH Music theme entry point.
+ *
+ * Bridges the custom [HHTheme] system (colors, shapes, dimens) to
+ * Material 3's [MaterialTheme] so existing components keep working
+ * while new components can use [HHTheme.colors] / [HHTheme.shapes] /
+ * [HHTheme.dimens] directly.
+ *
+ * Inspired by SaltUI's clean composition-local architecture:
+ * - [HHColors] provides semantic roles (highlight, text, subText,
+ *   background, subBackground, popup, stroke, surfaceTint, scrim).
+ * - [HHShapes] provides consistent rounded-corner shapes.
+ * - [HHDimens] provides a spacing system.
+ *
+ * @param isDarkTheme Whether to use the dark or light palette.
+ * @param content The composable content tree.
+ */
 @Composable
-fun HHMusicTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = HHColorScheme,
-        typography = MaterialTheme.typography,
-        content = content
-    )
+fun HHMusicTheme(
+    isDarkTheme: Boolean = false,
+    content: @Composable () -> Unit,
+) {
+    val colors = if (isDarkTheme) darkHHColors() else lightHHColors()
+
+    // Bridge to Material 3 color slots so existing components work seamlessly.
+    val materialColorScheme = if (isDarkTheme) {
+        darkColorScheme(
+            primary = colors.highlight,
+            onPrimary = colors.onHighlight,
+            primaryContainer = colors.highlight.copy(alpha = 0.15f),
+            onPrimaryContainer = colors.highlight,
+            secondary = colors.highlight,
+            background = colors.background,
+            onBackground = colors.text,
+            surface = colors.subBackground,
+            onSurface = colors.text,
+            surfaceVariant = colors.surfaceTint,
+            onSurfaceVariant = colors.subText,
+            outline = colors.stroke,
+            outlineVariant = colors.stroke.copy(alpha = 0.5f),
+            scrim = colors.scrim,
+            error = Color(0xFFCF6679),
+        )
+    } else {
+        lightColorScheme(
+            primary = colors.highlight,
+            onPrimary = colors.onHighlight,
+            primaryContainer = colors.highlight.copy(alpha = 0.12f),
+            onPrimaryContainer = colors.highlight,
+            secondary = colors.highlight,
+            background = colors.background,
+            onBackground = colors.text,
+            surface = colors.subBackground,
+            onSurface = colors.text,
+            surfaceVariant = colors.surfaceTint,
+            onSurfaceVariant = colors.subText,
+            outline = colors.stroke,
+            outlineVariant = colors.stroke.copy(alpha = 0.5f),
+            scrim = colors.scrim,
+            error = Color(0xFFB3261E),
+        )
+    }
+
+    HHThemeProvider(
+        colors = colors,
+        shapes = HHShapes.default(),
+        dimens = HHDimens.default(),
+    ) {
+        MaterialTheme(
+            colorScheme = materialColorScheme,
+            typography = MaterialTheme.typography,
+            content = content,
+        )
+    }
 }
