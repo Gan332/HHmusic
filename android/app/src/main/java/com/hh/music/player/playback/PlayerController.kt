@@ -223,7 +223,7 @@ class PlayerController(
             val idx = c.currentMediaItemIndex
             // Only hot-swap the current item's URI; do NOT re-prepare or touch
             // playWhenReady — that was re-buffering audio and causing stalls.
-            if (idx in c.currentMediaItems.indices && _queue.value.getOrNull(idx)?.id == song.id) {
+            if (idx in 0 until c.mediaItemCount && _queue.value.getOrNull(idx)?.id == song.id) {
                 val updated = song.toMediaItem(url)
                 c.replaceMediaItem(idx, updated)
             }

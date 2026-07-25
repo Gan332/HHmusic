@@ -22,6 +22,7 @@ private val QUALITY_OPTIONS = listOf(
     "hires" to "Hi-Res"
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     store: LocalStore,
