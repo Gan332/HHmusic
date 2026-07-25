@@ -264,5 +264,5 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedSafe(
     items: List<com.hh.music.player.data.Song>,
     itemContent: @Composable (index: Int, item: com.hh.music.player.data.Song) -> Unit
 ) {
-    items(items.size) { index -> itemContent(index, items[index]) }
+    this.items(items.size) { index -> itemContent(index, items[index]) }
 }
