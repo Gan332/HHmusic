@@ -25,6 +25,7 @@ import com.hh.music.player.ui.components.SongRow
 @Composable
 fun DiscoverScreen(
     repository: MusicRepository,
+    onOpenToplist: () -> Unit,
     onOpenPlaylist: (Long) -> Unit,
     onOpenPlayer: () -> Unit,
     vm: DiscoverViewModel = viewModel { DiscoverViewModel(repository) }
@@ -52,6 +53,12 @@ fun DiscoverScreen(
                 CircularProgressIndicator(Modifier.align(Alignment.Center))
             } else {
                 LazyColumn(Modifier.fillMaxSize()) {
+                    // Quick entries
+                    item {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+                            AssistChip(onClick = onOpenToplist, label = { Text("排行榜") })
+                        }
+                    }
                     // Section: 每日推荐
                     item { SectionHeader("每日推荐") }
                     itemsIndexed(state.recommend.take(10)) { index, song ->

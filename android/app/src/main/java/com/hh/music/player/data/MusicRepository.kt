@@ -8,6 +8,7 @@ import com.hh.music.player.network.HHMusicApi
 import com.hh.music.player.network.NetworkModule
 import com.hh.music.player.network.RecommendPlaylistItem
 import com.hh.music.player.network.ToplistResponse
+import kotlinx.coroutines.launch
 import com.hh.music.player.playback.PlayerController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -27,9 +28,12 @@ class MusicRepository(
     private val local: LocalStore? = null
 ) {
 
+    /** Runtime flags, kept in sync with [LocalStore] by [AppContainer]. */
+    @Volatile var useBackend: Boolean = false
+    @Volatile var audioQuality: String = "exhigh"
+
     companion object {
-        /** When true, route through the Node server (legacy). Default false = direct. */
-        const val USE_BACKEND = false
+        private const val TAG = "HHMusicRepo"
     }
 
     // ---------------- direct (NetEase) implementations ----------------
@@ -37,7 +41,7 @@ class MusicRepository(
     suspend fun search(keyword: String, limit: Int = 30, offset: Int = 0): Result<List<Song>> =
         runCatching {
             withContext(Dispatchers.IO) {
-                if (USE_BACKEND) {
+                if (useBackend) {
                     api.search(keyword, limit, offset).songs
                 } else {
                     val fields = mapOf(
@@ -54,7 +58,7 @@ class MusicRepository(
 
     suspend fun songDetail(ids: List<Long>): Result<List<Song>> = runCatching {
         withContext(Dispatchers.IO) {
-            if (USE_BACKEND) {
+            if (useBackend) {
                 api.songDetail(ids.joinToString(",")).songs
             } else {
                 val c = JSONArray().also { arr -> ids.forEach { arr.put(JSONObject().put("id", it)) } }.toString()
@@ -71,12 +75,12 @@ class MusicRepository(
      */
     suspend fun songUrl(id: Long): Result<SongUrl> = runCatching {
         withContext(Dispatchers.IO) {
-            if (USE_BACKEND) {
+            if (useBackend) {
                 api.songUrl(id)
             } else {
                 val payload = mapOf<String, Any>(
                     "ids" to JSONArray().put(id).toString(),
-                    "level" to "exhigh",
+                    "level" to audioQuality,
                     "encodeType" to "flac"
                 )
                 val body = DirectNcmClient.eapiPost("song/enhance/player/url/v1", payload)
@@ -97,7 +101,7 @@ class MusicRepository(
 
     suspend fun lyric(id: Long): Result<Lyric> = runCatching {
         withContext(Dispatchers.IO) {
-            if (USE_BACKEND) {
+            if (useBackend) {
                 api.lyric(id)
             } else {
                 val fields = mapOf(
@@ -119,7 +123,7 @@ class MusicRepository(
 
     suspend fun playlistDetail(id: Long): Result<Playlist> = runCatching {
         withContext(Dispatchers.IO) {
-            if (USE_BACKEND) {
+            if (useBackend) {
                 api.playlistDetail(id)
             } else {
                 val body = DirectNcmClient.apiPost("v6/playlist/detail", mapOf("id" to id.toString(), "n" to "1000"))
@@ -137,7 +141,7 @@ class MusicRepository(
 
     suspend fun toplists(): Result<List<ToplistItem>> = runCatching {
         withContext(Dispatchers.IO) {
-            if (USE_BACKEND) {
+            if (useBackend) {
                 api.toplist().list
             } else {
                 val body = DirectNcmClient.apiPost("toplist/detail", emptyMap())
@@ -148,7 +152,7 @@ class MusicRepository(
 
     suspend fun recommendSongs(limit: Int = 30): Result<List<Song>> = runCatching {
         withContext(Dispatchers.IO) {
-            if (USE_BACKEND) {
+            if (useBackend) {
                 api.recommendSongs(limit).songs
             } else {
                 val body = DirectNcmClient.apiPost("v3/discovery/recommend/songs", mapOf("limit" to limit.toString()))
@@ -165,7 +169,7 @@ class MusicRepository(
 
     suspend fun recommendPlaylists(limit: Int = 12): Result<List<RecommendPlaylistItem>> = runCatching {
         withContext(Dispatchers.IO) {
-            if (USE_BACKEND) {
+            if (useBackend) {
                 api.recommendPlaylists(limit).list
             } else {
                 val body = DirectNcmClient.apiPost("personalized/playlist", mapOf("limit" to limit.toString()))
@@ -189,7 +193,7 @@ class MusicRepository(
 
     suspend fun artistSongs(id: Long, limit: Int = 50, offset: Int = 0, order: String = "hot"): Result<List<Song>> = runCatching {
         withContext(Dispatchers.IO) {
-            if (USE_BACKEND) {
+            if (useBackend) {
                 api.artistSongs(id, limit, offset, order).songs
             } else {
                 val fields = mapOf(
@@ -207,7 +211,7 @@ class MusicRepository(
 
     suspend fun newSongs(limit: Int = 30): Result<List<Song>> = runCatching {
         withContext(Dispatchers.IO) {
-            if (USE_BACKEND) {
+            if (useBackend) {
                 api.newSongs(limit).songs
             } else {
                 val body = DirectNcmClient.apiPost("personalized/newsong", mapOf("limit" to limit.toString()))
@@ -229,4 +233,12 @@ class AppContainer(context: Context) {
     val localStore: LocalStore = LocalStore(context.applicationContext)
     val repository: MusicRepository = MusicRepository(local = localStore)
     val playerController: PlayerController = PlayerController(context.applicationContext, repository, localStore)
+
+    // Keep the repository runtime flags in sync with persisted user settings.
+    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
+
+    init {
+        scope.launch { localStore.useBackend.collect { repository.useBackend = it } }
+        scope.launch { localStore.audioQuality.collect { repository.audioQuality = it } }
+    }
 }

@@ -1,0 +1,144 @@
+package com.hh.music.player.ui.settings
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.hh.music.player.data.local.LocalStore
+
+private val QUALITY_OPTIONS = listOf(
+    "standard" to "标准 (128k)",
+    "higher" to "较高 (192k)",
+    "exhigh" to "极高 (320k)",
+    "lossless" to "无损 (FLAC)",
+    "hires" to "Hi-Res"
+)
+
+@Composable
+fun SettingsScreen(
+    store: LocalStore,
+    onBack: () -> Unit,
+    vm: SettingsViewModel = viewModel { SettingsViewModel(store) }
+) {
+    val useBackend by vm.useBackend.collectAsState()
+    val quality by vm.audioQuality.collectAsState()
+    var qualityMenuOpen by remember { mutableStateOf(false) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("设置") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // ---- 数据源 ----
+            SectionLabel("数据源")
+            Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.medium) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("直连网易云 (推荐)", fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                            Text("App 内置 eapi 加密，无需本机后端", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(checked = !useBackend, onCheckedChange = { vm.setUseBackend(!it) })
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("使用本地后端代理", fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                            Text("需先运行 server/，手机连电脑 IP:3000", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(checked = useBackend, onCheckedChange = { vm.setUseBackend(it) })
+                    }
+                    if (useBackend) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "已切换到后端模式，请确保 server/ 在运行且 NetworkModule.BASE_URL 可达。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+
+            // ---- 播放 ----
+            Spacer(Modifier.height(8.dp))
+            SectionLabel("播放")
+            Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.medium) {
+                Row(
+                    Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("默认音质", Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
+                    Box {
+                        TextButton(onClick = { qualityMenuOpen = true }) {
+                            Text(QUALITY_OPTIONS.firstOrNull { it.first == quality }?.second ?: quality)
+                        }
+                        DropdownMenu(expanded = qualityMenuOpen, onDismissRequest = { qualityMenuOpen = false }) {
+                            QUALITY_OPTIONS.forEach { (key, label) ->
+                                DropdownMenuItem(
+                                    text = { Text(label) },
+                                    onClick = { vm.setAudioQuality(key); qualityMenuOpen = false }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ---- 关于 ----
+            Spacer(Modifier.height(8.dp))
+            SectionLabel("关于")
+            Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.medium) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AboutRow("应用", "HH音乐")
+                    AboutRow("版本", "v1.3")
+                    AboutRow("数据接口", "网易云音乐 (eapi 直连)")
+                    AboutRow("参考", "GuitaristRin/Ncrust")
+                    AboutRow("技术栈", "Kotlin · Compose · Media3")
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+            Text(
+                "仅供学习交流，接口与资源版权归网易云音乐所有。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
+}
+
+@Composable
+private fun AboutRow(k: String, v: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(k, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        Text(v, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
+    }
+}

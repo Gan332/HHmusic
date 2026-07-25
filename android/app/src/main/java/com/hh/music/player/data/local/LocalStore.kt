@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.hh.music.player.data.SavedPlaylist
@@ -51,6 +52,11 @@ class LocalStore(private val context: Context) {
 
     // ---- Play mode (string persisted) ----
     private val playModeKey = stringPreferencesKey("play_mode")
+    // ---- Settings: direct vs backend, default audio quality ----
+    private val useBackendKey = booleanPreferencesKey("use_backend")
+    val useBackend: Flow<Boolean> = context.dataStore.data.map { it[useBackendKey] ?: false }
+    private val audioQualityKey = stringPreferencesKey("audio_quality")
+    val audioQuality: Flow<String> = context.dataStore.data.map { it[audioQualityKey] ?: "exhigh" }
     val playMode: Flow<String> = context.dataStore.data.map { it[playModeKey] ?: "sequence" }
 
     suspend fun toggleFavorite(song: Song) {
@@ -97,6 +103,8 @@ class LocalStore(private val context: Context) {
         }
     }
 
+    suspend fun setUseBackend(value: Boolean) { context.dataStore.edit { it[useBackendKey] = value } }
+    suspend fun setAudioQuality(value: String) { context.dataStore.edit { it[audioQualityKey] = value } }
     suspend fun setPlayMode(mode: String) {
         context.dataStore.edit { it[playModeKey] = mode }
     }

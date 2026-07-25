@@ -5,7 +5,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Leaderboard
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -21,8 +20,11 @@ import androidx.navigation.compose.rememberNavController
 import com.hh.music.player.data.AppContainer
 import com.hh.music.player.data.local.LocalStore
 import com.hh.music.player.playback.PlayerController
+import com.hh.music.player.ui.library.LibraryScreen
+import com.hh.music.player.ui.settings.SettingsScreen
+import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.Settings
 import com.hh.music.player.ui.discover.DiscoverScreen
-import com.hh.music.player.ui.mine.MineScreen
 import com.hh.music.player.ui.player.PlayerScreen
 import com.hh.music.player.ui.playlist.PlaylistScreen
 import com.hh.music.player.ui.playlist.ToplistScreen
@@ -32,7 +34,8 @@ object Routes {
     const val DISCOVER = "discover"
     const val SEARCH = "search"
     const val TOPLIST = "toplist"
-    const val MINE = "mine"
+    const val LIBRARY = "library"
+    const val SETTINGS = "settings"
     const val PLAYLIST = "playlist/{id}"
     const val PLAYER = "player"
 
@@ -57,8 +60,8 @@ fun HHMusicNavHost(container: AppContainer) {
     val tabs = listOf(
         TabItem(Routes.DISCOVER, "发现") { Icon(Icons.Filled.Explore, contentDescription = null) },
         TabItem(Routes.SEARCH, "搜索") { Icon(Icons.Filled.Search, contentDescription = null) },
-        TabItem(Routes.TOPLIST, "排行榜") { Icon(Icons.Filled.Leaderboard, contentDescription = null) },
-        TabItem(Routes.MINE, "我的") { Icon(Icons.Filled.Person, contentDescription = null) }
+        TabItem(Routes.LIBRARY, "音乐库") { Icon(Icons.Filled.LibraryMusic, contentDescription = null) },
+        TabItem(Routes.SETTINGS, "设置") { Icon(Icons.Filled.Settings, contentDescription = null) }
     )
 
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -99,6 +102,7 @@ fun HHMusicNavHost(container: AppContainer) {
                 composable(Routes.DISCOVER) {
                     DiscoverScreen(
                         repository = container.repository,
+                        onOpenToplist = { navController.navigate(Routes.TOPLIST) },
                         onOpenPlaylist = { id -> navController.navigate(Routes.playlist(id)) },
                         onOpenPlayer = { navController.navigate(Routes.PLAYER) }
                     )
@@ -115,11 +119,16 @@ fun HHMusicNavHost(container: AppContainer) {
                         onPlaylistClick = { id -> navController.navigate(Routes.playlist(id)) }
                     )
                 }
-                composable(Routes.MINE) {
-                    MineScreen(
-                        store = container.localStore,
+                composable(Routes.LIBRARY) {
+                    LibraryScreen(
                         onOpenPlaylist = { id -> navController.navigate(Routes.playlist(id)) },
                         onOpenPlayer = { navController.navigate(Routes.PLAYER) }
+                    )
+                }
+                composable(Routes.SETTINGS) {
+                    SettingsScreen(
+                        store = container.localStore,
+                        onBack = { navController.popBackStack() }
                     )
                 }
                 composable(Routes.PLAYLIST) { backStackEntry ->
@@ -133,6 +142,7 @@ fun HHMusicNavHost(container: AppContainer) {
                 composable(Routes.PLAYER) {
                     PlayerScreen(
                         repository = container.repository,
+                        onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                         onBack = { navController.popBackStack() }
                     )
                 }

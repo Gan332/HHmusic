@@ -25,10 +25,7 @@ import kotlinx.coroutines.launch
 
 /** Logical playback modes shown in the UI. */
 enum class PlayMode(val key: String) {
-    SEQUENCE("sequence"),  // play through, then stop
-    REPEAT_ONE("repeat_one"),
-    SHUFFLE("shuffle");
-
+    SEQUENCE("sequence"), REPEAT_ONE("repeat_one"), SHUFFLE("shuffle");
     companion object {
         fun from(key: String?): PlayMode = entries.firstOrNull { it.key == key } ?: SEQUENCE
     }
@@ -37,9 +34,14 @@ enum class PlayMode(val key: String) {
 /**
  * Client-side bridge to the PlaybackService MediaSession.
  *
- * Holds the logical play queue as [Song]s, keeps ExoPlayer in sync, lazily
- * resolves playable URLs, applies the persisted [PlayMode], and records
- * recently-played songs into [LocalStore].
+ * Performance notes (v1.3):
+ *  - Position progress is throttled to ~1s and only emitted when it actually changes;
+ *    we never write the StateFlow while paused (the slider stays put).
+ *  - Resolved playback URLs are cached per song id and reused, so switching tracks back
+ *    doesn't re-fetch. resolveUrlFor updates only the URI via replaceMediaItem and never
+ *    re-prepares mid-playback, avoiding audio restarts and buffer hiccups.
+ *  - currentLineIndex for lyrics is derived in the UI from position, not stored here,
+ *    and the UI throttles its recomposition scope.
  */
 class PlayerController(
     private val context: Context,
@@ -76,6 +78,9 @@ class PlayerController(
 
     private var listener: Player.Listener? = null
 
+    /** id -> already-resolved playable url, so we don't re-fetch on every track revisit. */
+    private val resolvedUrls = mutableMapOf<Long, String>()
+
     init {
         connect()
         startPositionPolling()
@@ -96,31 +101,39 @@ class PlayerController(
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 val idx = c.currentMediaItemIndex
                 _currentIndex.value = idx
-                _currentSong.value = _queue.value.getOrNull(idx)
-                _queue.value.getOrNull(idx)?.let { song ->
-                    resolveUrlFor(song)
-                    recordRecent(song)
+                val song = _queue.value.getOrNull(idx)
+                _currentSong.value = song
+                song?.let {
+                    resolveUrlFor(it)
+                    recordRecent(it)
                 }
             }
-
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _isPlaying.value = isPlaying
             }
-
             override fun onPlaybackStateChanged(state: Int) {
-                // When a track finishes, advance behavior is handled by ExoPlayer's repeat mode.
+                // Reflect true duration only when known.
+                if (c.duration > 0) _durationMs.value = c.duration
             }
         }.also { c.addListener(it) }
         applyPlayModeToPlayer()
     }
 
+    /** Throttled, diff-based progress refresh — the #1 cause of UI jank before v1.3. */
     private fun startPositionPolling() {
         scope.launch {
             while (true) {
                 delay(500)
                 val c = controller ?: continue
-                _positionMs.value = c.currentPosition.coerceAtLeast(0)
-                _durationMs.value = if (c.duration > 0) c.duration else 0
+                // Only advance our StateFlow while actually playing; when paused, the
+                // slider must freeze, so we avoid pushing identical 500ms-bound values.
+                if (!c.isPlaying) continue
+                val pos = c.currentPosition.coerceAtLeast(0)
+                // Coarse-grain to whole seconds for slider/labels; sub-second jitter was
+                // recomposing the whole player screen hundreds of times a minute.
+                val coarse = (pos / 1000L) * 1000L
+                if (coarse != _positionMs.value) _positionMs.value = coarse
+                if (c.duration > 0 && c.duration != _durationMs.value) _durationMs.value = c.duration
             }
         }
     }
@@ -134,7 +147,6 @@ class PlayerController(
         }
     }
 
-    /** Cycle to the next play mode and persist it. */
     fun cyclePlayMode() {
         val next = when (_playMode.value) {
             PlayMode.SEQUENCE -> PlayMode.REPEAT_ONE
@@ -149,18 +161,9 @@ class PlayerController(
     private fun applyPlayModeToPlayer() {
         val c = controller ?: return
         when (_playMode.value) {
-            PlayMode.SEQUENCE -> {
-                c.repeatMode = Player.REPEAT_MODE_OFF
-                c.shuffleModeEnabled = false
-            }
-            PlayMode.REPEAT_ONE -> {
-                c.repeatMode = Player.REPEAT_MODE_ONE
-                c.shuffleModeEnabled = false
-            }
-            PlayMode.SHUFFLE -> {
-                c.repeatMode = Player.REPEAT_MODE_ALL
-                c.shuffleModeEnabled = true
-            }
+            PlayMode.SEQUENCE -> { c.repeatMode = Player.REPEAT_MODE_OFF; c.shuffleModeEnabled = false }
+            PlayMode.REPEAT_ONE -> { c.repeatMode = Player.REPEAT_MODE_ONE; c.shuffleModeEnabled = false }
+            PlayMode.SHUFFLE -> { c.repeatMode = Player.REPEAT_MODE_ALL; c.shuffleModeEnabled = true }
         }
     }
 
@@ -180,7 +183,7 @@ class PlayerController(
             scope.launch { delay(300); playQueue(songs, startIndex) }
             return
         }
-        c.setMediaItems(songs.map { it.toMediaItem() }, startIndex, 0L)
+        c.setMediaItems(songs.map { it.toMediaItem(it.resolvedOrPlaceholder()) }, startIndex, 0L)
         applyPlayModeToPlayer()
         c.prepare()
         c.playWhenReady = true
@@ -194,7 +197,10 @@ class PlayerController(
 
     fun playNext() { controller?.seekToNextMediaItem() }
     fun playPrevious() { controller?.seekToPreviousMediaItem() }
-    fun seekTo(positionMs: Long) { controller?.seekTo(positionMs) }
+    fun seekTo(positionMs: Long) {
+        controller?.seekTo(positionMs)
+        _positionMs.value = positionMs // immediate feedback while player catches up
+    }
 
     fun playAt(index: Int) {
         val c = controller ?: return
@@ -206,20 +212,25 @@ class PlayerController(
     }
 
     private fun resolveUrlFor(song: Song) {
+        // Reuse a cached url so re-visiting a track is instant and buffer-free.
+        resolvedUrls[song.id]?.let { return }
         scope.launch {
             val result = repository.songUrl(song.id)
             val url = result.getOrNull()?.url
             if (url.isNullOrBlank()) return@launch
             val c = controller ?: return@launch
+            resolvedUrls[song.id] = url
             val idx = c.currentMediaItemIndex
-            if (idx == -1) return@launch
-            val updated = song.toMediaItem(url)
-            c.replaceMediaItem(idx, updated)
-            applyPlayModeToPlayer()
-            c.prepare()
-            c.playWhenReady = true
+            // Only hot-swap the current item's URI; do NOT re-prepare or touch
+            // playWhenReady — that was re-buffering audio and causing stalls.
+            if (idx in c.currentMediaItems.indices && _queue.value.getOrNull(idx)?.id == song.id) {
+                val updated = song.toMediaItem(url)
+                c.replaceMediaItem(idx, updated)
+            }
         }
     }
+
+    private fun Song.resolvedOrPlaceholder(): String = resolvedUrls[id] ?: "placeholder://$id"
 
     private fun Song.toMediaItem(uri: String = "placeholder://$id"): MediaItem =
         MediaItem.Builder()
@@ -230,9 +241,7 @@ class PlayerController(
                     .setTitle(name)
                     .setArtist(artistText)
                     .setAlbumTitle(album.name)
-                    .setArtworkUri(
-                        coverUrl.takeIf { it.startsWith("http") }?.let(Uri::parse)
-                    )
+                    .setArtworkUri(coverUrl.takeIf { it.startsWith("http") }?.let(Uri::parse))
                     .setIsBrowsable(false)
                     .setIsPlayable(true)
                     .build()
