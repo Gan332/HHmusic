@@ -61,6 +61,10 @@ class LocalStore(private val context: Context) {
     val audioQuality: Flow<String> = context.dataStore.data.map { it[audioQualityKey] ?: "exhigh" }
     val playMode: Flow<String> = context.dataStore.data.map { it[playModeKey] ?: "sequence" }
 
+    // ---- Backend URL (customizable) ----
+    private val backendUrlKey = stringPreferencesKey("backend_url")
+    val backendUrl: Flow<String> = context.dataStore.data.map { it[backendUrlKey] ?: "http://10.0.2.2:3000/api/" }
+
     suspend fun toggleFavorite(song: Song) {
         context.dataStore.edit { p ->
             val cur = p[favoritesKey]?.let { decode(it) } ?: emptyList()
@@ -108,6 +112,7 @@ class LocalStore(private val context: Context) {
     suspend fun setUseBackend(value: Boolean) { context.dataStore.edit { it[useBackendKey] = value } }
     suspend fun setIsDarkTheme(value: Boolean) { context.dataStore.edit { it[isDarkThemeKey] = value } }
     suspend fun setAudioQuality(value: String) { context.dataStore.edit { it[audioQualityKey] = value } }
+    suspend fun setBackendUrl(value: String) { context.dataStore.edit { it[backendUrlKey] = value } }
     suspend fun setPlayMode(mode: String) {
         context.dataStore.edit { it[playModeKey] = mode }
     }

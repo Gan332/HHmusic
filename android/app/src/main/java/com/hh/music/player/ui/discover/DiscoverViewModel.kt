@@ -6,7 +6,6 @@ import com.hh.music.player.data.MusicRepository
 import com.hh.music.player.data.Song
 import com.hh.music.player.network.RecommendPlaylistItem
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,12 +34,15 @@ class DiscoverViewModel(private val repository: MusicRepository) : ViewModel() {
             val rec = recDef.await()
             val new = newDef.await()
             val pl = plDef.await()
+            val errMsg = if (rec.isFailure && new.isFailure && pl.isFailure) {
+                if (repository.useBackend) "加载失败，请检查后端服务是否运行" else "加载失败，请检查网络连接"
+            } else null
             _state.value = DiscoverState(
                 loading = false,
                 recommend = rec.getOrElse { emptyList() },
                 newSongs = new.getOrElse { emptyList() },
                 playlists = pl.getOrElse { emptyList() },
-                error = if (rec.isFailure && new.isFailure && pl.isFailure) "加载失败，请检查后端" else null
+                error = errMsg
             )
         }
     }

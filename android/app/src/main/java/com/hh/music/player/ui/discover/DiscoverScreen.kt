@@ -19,6 +19,7 @@ import coil.compose.AsyncImage
 import com.hh.music.player.data.MusicRepository
 import com.hh.music.player.network.RecommendPlaylistItem
 import com.hh.music.player.ui.LocalPlayerController
+import com.hh.music.player.ui.LocalStoreProvider
 import com.hh.music.player.ui.components.MiniPlayerBar
 import com.hh.music.player.ui.components.SongRow
 
@@ -34,6 +35,7 @@ fun DiscoverScreen(
     val player = LocalPlayerController.current
     val currentSong by player.currentSong.collectAsState()
     val isPlaying by player.isPlaying.collectAsState()
+    val useBackend by LocalStoreProvider.current.useBackend.collectAsState(initial = false)
 
     Scaffold(
         topBar = {

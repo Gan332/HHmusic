@@ -232,10 +232,12 @@ class MusicRepository(
         withContext(Dispatchers.IO) {
             if (useBackend) {
                 api.likeSong(com.hh.music.player.network.LikeBody(id, like))
-                like
+                true
             } else {
                 val fields = mapOf("trackId" to id.toString(), "like" to like.toString())
-                DirectNcmClient.apiPost("song/like", fields)
+                val body = DirectNcmClient.apiPost("song/like", fields)
+                val code = org.json.JSONObject(body).optInt("code", -1)
+                if (code != 200) throw Exception("NetEase returned code=$code")
                 like
             }
         }
@@ -254,5 +256,6 @@ class AppContainer(context: Context) {
     init {
         scope.launch { localStore.useBackend.collect { repository.useBackend = it } }
         scope.launch { localStore.audioQuality.collect { repository.audioQuality = it } }
+        scope.launch { localStore.backendUrl.collect { url -> NetworkModule.BASE_URL = url } }
     }
 }

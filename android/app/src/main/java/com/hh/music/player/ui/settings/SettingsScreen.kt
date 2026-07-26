@@ -32,7 +32,10 @@ fun SettingsScreen(
     val useBackend by vm.useBackend.collectAsState()
     val quality by vm.audioQuality.collectAsState()
     val isDarkTheme by vm.isDarkTheme.collectAsState()
+    val backendUrl by vm.backendUrl.collectAsState()
     var qualityMenuOpen by remember { mutableStateOf(false) }
+    var editingUrl by remember { mutableStateOf(false) }
+    var draftUrl by remember(backendUrl) { mutableStateOf(backendUrl) }
 
     Scaffold(
         topBar = {
@@ -69,6 +72,33 @@ fun SettingsScreen(
                             )
                         }
                         Switch(checked = useBackend, onCheckedChange = { vm.setUseBackend(it) })
+                    }
+                    if (useBackend) {
+                        Spacer(Modifier.height(12.dp))
+                        if (editingUrl) {
+                            OutlinedTextField(
+                                value = draftUrl,
+                                onValueChange = { draftUrl = it },
+                                label = { Text("后端地址") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(onClick = {
+                                    draftUrl = backendUrl
+                                    editingUrl = false
+                                }) { Text("取消") }
+                                Button(onClick = {
+                                    vm.setBackendUrl(draftUrl)
+                                    editingUrl = false
+                                }) { Text("保存") }
+                            }
+                        } else {
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text(backendUrl, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                                TextButton(onClick = { editingUrl = true }) { Text("修改") }
+                            }
+                        }
                     }
                 }
             }

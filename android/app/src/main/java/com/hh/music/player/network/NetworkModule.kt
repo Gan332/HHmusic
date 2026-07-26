@@ -19,7 +19,11 @@ object NetworkModule {
      *
      * Run the server with:  cd server && npm start
      */
-    var BASE_URL: String = "http://10.0.2.2:3000/api/"
+    @Volatile var BASE_URL: String = "http://10.0.2.2:3000/api/"
+        set(value) {
+            field = value.trimEnd('/').let { if (it.endsWith("/api")) it else "$it/api/" }
+            _api = null  // force rebuild on next access
+        }
 
     val json: Json = Json {
         ignoreUnknownKeys = true
@@ -38,12 +42,20 @@ object NetworkModule {
             .build()
     }
 
-    val api: HHMusicApi by lazy {
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .client(okHttpClient)
-            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
-            .build()
-            .create(HHMusicApi::class.java)
-    }
+    @Volatile private var _api: HHMusicApi? = null
+
+    val api: HHMusicApi
+        get() {
+            val existing = _api
+            if (existing != null) return existing
+            return synchronized(this) {
+                _api ?: Retrofit.Builder()
+                    .baseUrl(BASE_URL)
+                    .client(okHttpClient)
+                    .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+                    .build()
+                    .create(HHMusicApi::class.java)
+                    .also { _api = it }
+            }
+        }
 }

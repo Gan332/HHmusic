@@ -8,14 +8,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-data class SettingsState(
-    val useBackend: Boolean = false,
-    val audioQuality: String = "exhigh",
-    val isDarkTheme: Boolean = false,
-    val aboutVersion: String = "1.3"
-)
-
-
 class SettingsViewModel(private val store: LocalStore) : ViewModel() {
 
     val useBackend: StateFlow<Boolean> =
@@ -27,7 +19,11 @@ class SettingsViewModel(private val store: LocalStore) : ViewModel() {
     val isDarkTheme: StateFlow<Boolean> =
         store.isDarkTheme.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    val backendUrl: StateFlow<String> =
+        store.backendUrl.stateIn(viewModelScope, SharingStarted.Eagerly, "http://10.0.2.2:3000/api/")
+
     fun setUseBackend(value: Boolean) { viewModelScope.launch { store.setUseBackend(value) } }
     fun setAudioQuality(value: String) { viewModelScope.launch { store.setAudioQuality(value) } }
     fun setIsDarkTheme(value: Boolean) { viewModelScope.launch { store.setIsDarkTheme(value) } }
+    fun setBackendUrl(value: String) { viewModelScope.launch { store.setBackendUrl(value) } }
 }

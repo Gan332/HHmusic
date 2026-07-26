@@ -24,6 +24,21 @@ function sendResult(res, result) {
   return res.status(status).json(result.data ?? result);
 }
 
+/**
+ * Wrap a NetEase upstream response.
+ * On success (HTTP 2xx + code 200) calls dataFn() to build the response body.
+ * On failure, forwards the original NetEase error code and message.
+ */
+function neteaseResult(r, dataFn) {
+  if (r.status >= 400 || (r.data && r.data.code != null && r.data.code !== 200)) {
+    return {
+      status: r.status,
+      data: { code: r.data?.code ?? r.status, msg: r.data?.msg ?? "upstream error" },
+    };
+  }
+  return { status: 200, data: dataFn() };
+}
+
 function toInt(v, def = 0) {
   const n = parseInt(v, 10);
   return Number.isFinite(n) ? n : def;
@@ -50,9 +65,10 @@ app.get("/api/search", asyncHandler(async (req, res) => {
   const limit = toInt(req.query.limit, 30);
   const offset = toInt(req.query.offset, 0);
   const r = await searchSongs(keyword, limit, offset);
-  const songs = r.data?.result?.songs ?? [];
-  const normalized = songs.map(normalizeSongNetease);
-  sendResult(res, { status: r.status, data: { code: 200, songCount: r.data?.result?.songCount ?? 0, songs: normalized } });
+  sendResult(res, neteaseResult(r, () => {
+    const songs = (r.data?.result?.songs ?? []).map(normalizeSongNetease);
+    return { code: 200, songCount: r.data?.result?.songCount ?? 0, songs };
+  }));
 }));
 
 /* ------------------------- Song detail ---------------------------- */
@@ -62,8 +78,10 @@ app.get("/api/song/detail", asyncHandler(async (req, res) => {
   const idList = ids.split(",").map((x) => toInt(x)).filter((x) => x > 0);
   if (!idList.length) return res.status(400).json({ code: 400, msg: "missing valid ids" });
   const r = await getSongDetail(idList);
-  const songs = (r.data?.songs ?? []).map(normalizeSongNetease);
-  sendResult(res, { status: r.status, data: { code: 200, songs } });
+  sendResult(res, neteaseResult(r, () => {
+    const songs = (r.data?.songs ?? []).map(normalizeSongNetease);
+    return { code: 200, songs };
+  }));
 }));
 
 /* --------------------------- Song URL ----------------------------- */
@@ -72,10 +90,9 @@ app.get("/api/song/url", asyncHandler(async (req, res) => {
   if (!id) return res.status(400).json({ code: 400, msg: "missing id" });
   const level = (req.query.level ?? "exhigh").toString();
   const r = await getSongUrl(id, level);
-  const d = (r.data?.data ?? [])[0] ?? {};
-  sendResult(res, {
-    status: r.status,
-    data: {
+  sendResult(res, neteaseResult(r, () => {
+    const d = (r.data?.data ?? [])[0] ?? {};
+    return {
       code: 200,
       id: d.id,
       url: d.url,
@@ -84,8 +101,8 @@ app.get("/api/song/url", asyncHandler(async (req, res) => {
       type: d.type,
       md5: d.md5,
       freeTrialInfo: d.freeTrialInfo ?? null,
-    },
-  });
+    };
+  }));
 }));
 
 /* ----------------------------- Lyric ------------------------------ */
@@ -93,17 +110,16 @@ app.get("/api/lyric", asyncHandler(async (req, res) => {
   const id = toInt(req.query.id, 0);
   if (!id) return res.status(400).json({ code: 400, msg: "missing id" });
   const r = await getLyric(id);
-  const lyc = r.data ?? {};
-  sendResult(res, {
-    status: r.status,
-    data: {
+  sendResult(res, neteaseResult(r, () => {
+    const lyc = r.data ?? {};
+    return {
       code: 200,
       lrc: lyc.lrc?.lyric ?? "",
       tlyric: lyc.tlyric?.lyric ?? "",
       romalrc: lyc.romalrc?.lyric ?? "",
       yrc: lyc.yrc?.lyric ?? "",
-    },
-  });
+    };
+  }));
 }));
 
 /* ---------------------------- Playlist ---------------------------- */
@@ -111,32 +127,33 @@ app.get("/api/playlist/detail", asyncHandler(async (req, res) => {
   const id = toInt(req.query.id, 0);
   if (!id) return res.status(400).json({ code: 400, msg: "missing id" });
   const r = await getPlaylistDetail(id);
-  const pl = r.data?.playlist ?? {};
-  const tracks = (pl.tracks ?? []).map(normalizeSongNetease);
-  sendResult(res, {
-    status: r.status,
-    data: {
+  sendResult(res, neteaseResult(r, () => {
+    const pl = r.data?.playlist ?? {};
+    const tracks = (pl.tracks ?? []).map(normalizeSongNetease);
+    return {
       code: 200,
       id: pl.id,
       name: pl.name,
       coverImgUrl: pl.coverImgUrl,
       creator: { id: pl.creator?.id, nickname: pl.creator?.nickname },
       tracks,
-    },
-  });
+    };
+  }));
 }));
 
 /* ----------------------------- Toplist ---------------------------- */
 app.get("/api/toplist", asyncHandler(async (req, res) => {
   const r = await getToplists();
-  const list = (r.data?.list ?? []).map((t) => ({
-    id: t.id,
-    name: t.name,
-    coverImgUrl: t.coverImgUrl,
-    description: t.description,
-    updateFrequency: t.updateFrequency,
+  sendResult(res, neteaseResult(r, () => {
+    const list = (r.data?.list ?? []).map((t) => ({
+      id: t.id,
+      name: t.name,
+      coverImgUrl: t.coverImgUrl,
+      description: t.description,
+      updateFrequency: t.updateFrequency,
+    }));
+    return { code: 200, list };
   }));
-  sendResult(res, { status: r.status, data: { code: 200, list } });
 }));
 
 /* ----------------------------- Like song -------------------------- */
@@ -145,29 +162,35 @@ app.post("/api/song/like", asyncHandler(async (req, res) => {
   if (!id) return res.status(400).json({ code: 400, msg: "missing id" });
   const like = req.body?.like !== false && req.body?.like !== "false";
   const r = await likeSong(id, like);
-  sendResult(res, { status: r.status, data: { code: 200, id, like, raw: r.data?.code } });
+  sendResult(res, neteaseResult(r, () => ({
+    code: 200, id, like, raw: r.data?.code,
+  })));
 }));
 
 /* ----------------------- Recommend songs (每日推荐) -------------------- */
 app.get("/api/recommend/songs", asyncHandler(async (req, res) => {
   const limit = toInt(req.query.limit, 30);
   const r = await getRecommendSongs(limit);
-  const songs = (r.data?.data?.dailySongs ?? r.data?.recommend ?? []).map(normalizeSongNetease);
-  sendResult(res, { status: r.status, data: { code: 200, songs } });
+  sendResult(res, neteaseResult(r, () => {
+    const songs = (r.data?.data?.dailySongs ?? r.data?.recommend ?? []).map(normalizeSongNetease);
+    return { code: 200, songs };
+  }));
 }));
 
 /* ------------------- Recommend playlists (推荐歌单) ------------------- */
 app.get("/api/recommend/playlists", asyncHandler(async (req, res) => {
   const limit = toInt(req.query.limit, 12);
   const r = await getRecommendPlaylists(limit);
-  const list = (r.data?.result ?? []).map((p) => ({
-    id: p.id,
-    name: p.name,
-    picUrl: p.picUrl,
-    playcount: p.playcount ?? p.playCount,
-    creator: { nickname: (p.creator ?? {}).nickname },
+  sendResult(res, neteaseResult(r, () => {
+    const list = (r.data?.result ?? []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      picUrl: p.picUrl,
+      playcount: p.playcount ?? p.playCount,
+      creator: { nickname: (p.creator ?? {}).nickname },
+    }));
+    return { code: 200, list };
   }));
-  sendResult(res, { status: r.status, data: { code: 200, list } });
 }));
 
 /* ------------------------- Artist hot songs -------------------------- */
@@ -178,19 +201,23 @@ app.get("/api/artist/songs", asyncHandler(async (req, res) => {
   const offset = toInt(req.query.offset, 0);
   const order = (req.query.order ?? "hot").toString();
   const r = await getArtistSongs(id, limit, offset, order);
-  const songs = (r.data?.songs ?? []).map(normalizeSongNetease);
-  sendResult(res, { status: r.status, data: { code: 200, total: r.data?.total ?? songs.length, songs } });
+  sendResult(res, neteaseResult(r, () => {
+    const songs = (r.data?.songs ?? []).map(normalizeSongNetease);
+    return { code: 200, total: r.data?.total ?? songs.length, songs };
+  }));
 }));
 
 /* --------------------------- New songs ------------------------------- */
 app.get("/api/new/song", asyncHandler(async (req, res) => {
   const limit = toInt(req.query.limit, 30);
   const r = await getNewSongs(limit);
-  const items = (r.data?.result ?? r.data?.data ?? []).map((it) => {
-    const s = it.song ?? it;
-    return normalizeSongNetease(s);
-  });
-  sendResult(res, { status: r.status, data: { code: 200, songs: items } });
+  sendResult(res, neteaseResult(r, () => {
+    const items = (r.data?.result ?? r.data?.data ?? []).map((it) => {
+      const s = it.song ?? it;
+      return normalizeSongNetease(s);
+    });
+    return { code: 200, songs: items };
+  }));
 }));
 
 app.get("/api/health", (_req, res) => res.json({ code: 200, ok: true, ts: Date.now() }));

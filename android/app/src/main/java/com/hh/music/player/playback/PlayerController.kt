@@ -80,8 +80,16 @@ class PlayerController(
     private var listener: Player.Listener? = null
     private var wiredController: MediaController? = null
 
-    /** id -> already-resolved playable url, so we don't re-fetch on every track revisit. */
-    private val resolvedUrls = mutableMapOf<Long, String>()
+    /** id -> already-resolved playable url, so we don't re-fetch on every track revisit.
+     * LRU-evicting cache — keeps the most recent [resolvedUrlsMaxSize] entries. */
+    private val resolvedUrls = object : LinkedHashMap<Long, String>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, String>): Boolean =
+            size > resolvedUrlsMaxSize
+    }
+    private val resolvedUrlsMaxSize = 200
+
+    /** Generation counter to invalidate stale playQueue retries. */
+    private var playQueueGen = 0
 
     private var seekLockUntil = 0L
 
@@ -179,17 +187,22 @@ class PlayerController(
     /** Replace the queue and start playing at [startIndex]. */
     fun playQueue(songs: List<Song>, startIndex: Int = 0, attempt: Int = 0) {
         if (songs.isEmpty()) return
+        if (startIndex !in songs.indices) return
+        val gen = ++playQueueGen
+        val c = controller
+        if (c == null) {
+            if (attempt < 10) {
+                scope.launch {
+                    delay(300)
+                    if (playQueueGen == gen) playQueue(songs, startIndex, attempt + 1)
+                }
+            }
+            return
+        }
         _queue.value = songs
         _currentIndex.value = startIndex
         _currentSong.value = songs[startIndex]
         recordRecent(songs[startIndex])
-        val c = controller
-        if (c == null) {
-            if (attempt < 10) {
-                scope.launch { delay(300); playQueue(songs, startIndex, attempt + 1) }
-            }
-            return
-        }
         c.setMediaItems(songs.map { it.toMediaItem(it.resolvedOrPlaceholder()) }, startIndex, 0L)
         applyPlayModeToPlayer()
         c.prepare()
@@ -214,7 +227,9 @@ class PlayerController(
         val c = controller ?: return
         if (index in _queue.value.indices) {
             c.seekToDefaultPosition(index)
-            c.prepare()
+            if (c.playbackState != Player.STATE_READY && c.playbackState != Player.STATE_BUFFERING) {
+                c.prepare()
+            }
             c.playWhenReady = true
         }
     }
