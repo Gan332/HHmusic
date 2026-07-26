@@ -60,26 +60,15 @@ fun SettingsScreen(
                 Column(Modifier.padding(16.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("直连网易云 (推荐)", fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-                            Text("App 内置 eapi 加密，无需本机后端", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Switch(checked = !useBackend, onCheckedChange = { vm.setUseBackend(!it) })
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
                             Text("使用本地后端代理", fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-                            Text("需先运行 server/，手机连电脑 IP:3000", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                if (useBackend) "已启用 — 需运行 server/ 且 BASE_URL 可达"
+                                else "关闭时直连网易云 (eapi 加密，推荐)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (useBackend) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                         Switch(checked = useBackend, onCheckedChange = { vm.setUseBackend(it) })
-                    }
-                    if (useBackend) {
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "已切换到后端模式，请确保 server/ 在运行且 NetworkModule.BASE_URL 可达。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
                     }
                 }
             }

@@ -9,7 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.staticCompositionLocalOf
 
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -44,12 +44,12 @@ object Routes {
 }
 
 /** Provides the app-wide player controller to composables. */
-val LocalPlayerController = compositionLocalOf<PlayerController> {
+val LocalPlayerController = staticCompositionLocalOf<PlayerController> {
     error("PlayerController not provided")
 }
 
 /** Provides the local store (favorites/recent/history). */
-val LocalStoreProvider = compositionLocalOf<LocalStore> {
+val LocalStoreProvider = staticCompositionLocalOf<LocalStore> {
     error("LocalStore not provided")
 }
 
@@ -117,7 +117,9 @@ fun HHMusicNavHost(container: AppContainer) {
                 composable(Routes.TOPLIST) {
                     ToplistScreen(
                         repository = container.repository,
-                        onPlaylistClick = { id -> navController.navigate(Routes.playlist(id)) }
+                        onPlaylistClick = { id -> navController.navigate(Routes.playlist(id)) },
+                        onBack = { navController.popBackStack() },
+                        onOpenPlayer = { navController.navigate(Routes.PLAYER) }
                     )
                 }
                 composable(Routes.LIBRARY) {
@@ -133,12 +135,17 @@ fun HHMusicNavHost(container: AppContainer) {
                     )
                 }
                 composable(Routes.PLAYLIST) { backStackEntry ->
-                    val id = backStackEntry.arguments?.getString("id")?.toLongOrNull() ?: 0L
-                    PlaylistScreen(
-                        playlistId = id,
-                        repository = container.repository,
-                        onBack = { navController.popBackStack() }
-                    )
+                    val id = backStackEntry.arguments?.getString("id")?.toLongOrNull()
+                    if (id == null || id <= 0) {
+                        LaunchedEffect(Unit) { navController.popBackStack() }
+                    } else {
+                        PlaylistScreen(
+                            playlistId = id,
+                            repository = container.repository,
+                            onBack = { navController.popBackStack() },
+                            onOpenPlayer = { navController.navigate(Routes.PLAYER) }
+                        )
+                    }
                 }
                 composable(Routes.PLAYER) {
                     PlayerScreen(

@@ -227,6 +227,19 @@ class MusicRepository(
             }
         }
     }
+
+    suspend fun likeSong(id: Long, like: Boolean = true): Result<Boolean> = runCatching {
+        withContext(Dispatchers.IO) {
+            if (useBackend) {
+                api.likeSong(com.hh.music.player.network.LikeBody(id, like))
+                like
+            } else {
+                val fields = mapOf("trackId" to id.toString(), "like" to like.toString())
+                DirectNcmClient.apiPost("song/like", fields)
+                like
+            }
+        }
+    }
 }
 
 /** Manual dependency injection container, created in HHMusicApp. */

@@ -32,20 +32,28 @@ async function neteaseRequest(type, payload, extraHeaders = {}) {
     ...extraHeaders,
   };
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers,
-    body: new URLSearchParams(body).toString(),
-  });
-
-  const text = await res.text();
-  let json;
   try {
-    json = JSON.parse(text);
-  } catch {
-    json = { code: res.status, raw: text };
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const res = await fetch(url, {
+      method: "POST",
+      headers,
+      body: new URLSearchParams(body).toString(),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    const text = await res.text();
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = { code: res.status, raw: text };
+    }
+    return { status: res.status, data: json };
+  } catch (err) {
+    return { status: 502, data: { code: 502, msg: "upstream fetch failed", error: err.message } };
   }
-  return { status: res.status, data: json };
 }
 
 export async function searchSongs(keyword, limit = 30, offset = 0) {

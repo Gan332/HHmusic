@@ -27,6 +27,7 @@ fun PlaylistScreen(
     playlistId: Long,
     repository: MusicRepository,
     onBack: () -> Unit,
+    onOpenPlayer: () -> Unit = {},
     vm: PlaylistViewModel = viewModel { PlaylistViewModel(repository) }
 ) {
     val state by vm.state.collectAsState()
@@ -84,7 +85,7 @@ fun PlaylistScreen(
             when {
                 state.loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
                 state.error != null -> Text(
-                    state.error!!, color = MaterialTheme.colorScheme.error,
+                    state.error ?: "", color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.align(Alignment.Center).padding(24.dp)
                 )
                 else -> {
@@ -106,7 +107,7 @@ fun PlaylistScreen(
             }
             MiniPlayerBar(
                 player = player,
-                onClick = { },
+                onClick = onOpenPlayer,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
         }

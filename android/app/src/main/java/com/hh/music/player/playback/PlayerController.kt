@@ -16,6 +16,7 @@ import com.hh.music.player.data.local.LocalStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -77,9 +78,12 @@ class PlayerController(
     val playMode: StateFlow<PlayMode> = _playMode.asStateFlow()
 
     private var listener: Player.Listener? = null
+    private var wiredController: MediaController? = null
 
     /** id -> already-resolved playable url, so we don't re-fetch on every track revisit. */
     private val resolvedUrls = mutableMapOf<Long, String>()
+
+    private var seekLockUntil = 0L
 
     init {
         connect()
@@ -96,7 +100,9 @@ class PlayerController(
     }
 
     private fun wireListener(c: MediaController) {
-        if (listener != null) return
+        if (wiredController === c) return
+        listener?.let { wiredController?.removeListener(it) }
+        wiredController = c
         listener = object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 val idx = c.currentMediaItemIndex
@@ -125,9 +131,8 @@ class PlayerController(
             while (true) {
                 delay(500)
                 val c = controller ?: continue
-                // Only advance our StateFlow while actually playing; when paused, the
-                // slider must freeze, so we avoid pushing identical 500ms-bound values.
                 if (!c.isPlaying) continue
+                if (System.currentTimeMillis() < seekLockUntil) continue
                 val pos = c.currentPosition.coerceAtLeast(0)
                 // Coarse-grain to whole seconds for slider/labels; sub-second jitter was
                 // recomposing the whole player screen hundreds of times a minute.
@@ -172,7 +177,7 @@ class PlayerController(
     }
 
     /** Replace the queue and start playing at [startIndex]. */
-    fun playQueue(songs: List<Song>, startIndex: Int = 0) {
+    fun playQueue(songs: List<Song>, startIndex: Int = 0, attempt: Int = 0) {
         if (songs.isEmpty()) return
         _queue.value = songs
         _currentIndex.value = startIndex
@@ -180,7 +185,9 @@ class PlayerController(
         recordRecent(songs[startIndex])
         val c = controller
         if (c == null) {
-            scope.launch { delay(300); playQueue(songs, startIndex) }
+            if (attempt < 10) {
+                scope.launch { delay(300); playQueue(songs, startIndex, attempt + 1) }
+            }
             return
         }
         c.setMediaItems(songs.map { it.toMediaItem(it.resolvedOrPlaceholder()) }, startIndex, 0L)
@@ -199,7 +206,8 @@ class PlayerController(
     fun playPrevious() { controller?.seekToPreviousMediaItem() }
     fun seekTo(positionMs: Long) {
         controller?.seekTo(positionMs)
-        _positionMs.value = positionMs // immediate feedback while player catches up
+        _positionMs.value = positionMs
+        seekLockUntil = System.currentTimeMillis() + 800
     }
 
     fun playAt(index: Int) {
@@ -249,7 +257,11 @@ class PlayerController(
             .build()
 
     fun release() {
-        listener?.let { controller?.removeListener(it) }
+        listener?.let { wiredController?.removeListener(it) }
+        listener = null
+        wiredController = null
         controllerFuture?.let { MediaController.releaseFuture(it) }
+        resolvedUrls.clear()
+        scope.cancel()
     }
 }

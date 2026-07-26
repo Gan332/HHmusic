@@ -69,7 +69,7 @@ object DirectNcmClient {
 
     /** Public (no-login) playable URL — the Ncrust outer-url fallback. */
     fun outerUrl(songId: Long): String =
-        HOST + "/song/media/outer/url?id=$songId.mp3"
+        HOST + "/song/media/outer/url?id=$songId"
 
     /** Optional login cookie (MUSIC_U). Null by default = anonymous guest. */
     @Volatile

@@ -45,6 +45,7 @@ class SearchViewModel(
     /// Triggered when a user picks a term from history.
     fun submitSearch(keyword: String) {
         if (keyword.isBlank()) return
+        _state.update { it.copy(query = keyword) }
         searchJob?.cancel()
         searchJob = viewModelScope.launch { doSearch(keyword) }
     }

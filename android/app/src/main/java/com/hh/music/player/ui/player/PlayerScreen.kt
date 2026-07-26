@@ -3,6 +3,7 @@ package com.hh.music.player.ui.player
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -91,9 +92,10 @@ fun PlayerScreen(
             Spacer(Modifier.height(12.dp))
 
             // Cover (stable; recomposes on song change only)
-            if (song != null && song!!.coverUrl.startsWith("http")) {
+            val coverSong = song
+            if (coverSong != null && coverSong.coverUrl.startsWith("http")) {
                 AsyncImage(
-                    model = song!!.coverUrl, contentDescription = null,
+                    model = coverSong.coverUrl, contentDescription = null,
                     modifier = Modifier.fillMaxWidth(0.7f).height(280.dp).clip(RoundedCornerShape(16.dp)).align(Alignment.CenterHorizontally)
                 )
             } else {
@@ -210,8 +212,8 @@ private fun LyricsSection(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(vertical = 32.dp)
             ) {
-                items(lyricList) { line ->
-                    val active = lyricList.indexOf(line) == activeIndex
+                itemsIndexed(lyricList) { index, line ->
+                    val active = index == activeIndex
                     Text(
                         text = line.text.ifBlank { "♪" },
                         style = MaterialTheme.typography.bodyLarge,

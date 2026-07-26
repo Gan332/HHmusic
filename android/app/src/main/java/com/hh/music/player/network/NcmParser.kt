@@ -19,7 +19,10 @@ object NcmParser {
         val al = s.optJSONObject("al") ?: s.optJSONObject("album")
         val ar = s.optJSONArray("ar") ?: s.optJSONArray("artists")
         val artists = mutableListOf<Artist>()
-        ar?.let { for (i in 0 until it.length()) artists += Artist(it.optJSONObject(i)?.optLong("id", 0) ?: 0, it.optJSONObject(i)?.optString("name", "") ?: "") }
+        ar?.let { for (i in 0 until it.length()) {
+            val obj = it.optJSONObject(i) ?: continue
+            artists += Artist(obj.optLong("id", 0), obj.optString("name", ""))
+        } }
         return Song(
             id = s.optLong("id", 0),
             name = s.optString("name", "未知歌曲"),

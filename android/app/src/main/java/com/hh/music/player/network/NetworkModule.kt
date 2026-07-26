@@ -13,12 +13,13 @@ object NetworkModule {
     /**
      * Base URL of the backend Node/Express proxy.
      *
-     * Emulators:    use http://10.0.2.2:3000/ to reach host localhost:3000
-     * Real devices: use your PC LAN IP, e.g. http://192.168.1.100:3000/
+     * Emulators:    use http://10.0.2.2:3000/api/ to reach host localhost:3000
+     * Real devices: use your PC LAN IP, e.g. http://192.168.x.x:3000/api/
+     *               (update via app Settings when switching networks)
      *
      * Run the server with:  cd server && npm start
      */
-    const val BASE_URL: String = "http://192.168.50.112:3000/api/"
+    var BASE_URL: String = "http://10.0.2.2:3000/api/"
 
     val json: Json = Json {
         ignoreUnknownKeys = true

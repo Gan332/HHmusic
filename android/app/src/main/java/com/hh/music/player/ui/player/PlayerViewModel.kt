@@ -29,7 +29,9 @@ class PlayerViewModel(private val repository: MusicRepository) : ViewModel() {
                         loading = false,
                         lyric = lrc,
                         lines = LyricParser.parse(lrc.lrc),
-                        translations = LyricParser.parse(lrc.tlyric).associate { it.timeMs to it.text }
+                        translations = LyricParser.parse(lrc.tlyric)
+                            .groupBy({ it.timeMs }, { it.text })
+                            .mapValues { (_, texts) -> texts.joinToString("\n") }
                     )
                 }
                 .onFailure {

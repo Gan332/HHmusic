@@ -88,7 +88,7 @@ fun SearchScreen(
                     // Search history section
                     SearchHistorySection(
                         history = history,
-                        onPick = { kw -> actualVm.onQueryChange(kw); actualVm.submitSearch(kw) },
+                        onPick = { kw -> actualVm.submitSearch(kw) },
                         onClear = { actualVm.clearHistory() }
                     )
                 }

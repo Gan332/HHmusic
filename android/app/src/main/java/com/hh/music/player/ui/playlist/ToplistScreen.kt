@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,21 +20,26 @@ import com.hh.music.player.data.MusicRepository
 import com.hh.music.player.ui.LocalPlayerController
 import com.hh.music.player.ui.components.MiniPlayerBar
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ToplistScreen(
     repository: MusicRepository,
     onPlaylistClick: (Long) -> Unit,
+    onBack: () -> Unit = {},
+    onOpenPlayer: () -> Unit = {},
     vm: ToplistViewModel = viewModel { ToplistViewModel(repository) }
 ) {
     val state by vm.state.collectAsState()
 
     Scaffold(
         topBar = {
-            Text(
-                "排行榜",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp)
+            TopAppBar(
+                title = { Text("排行榜") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                    }
+                }
             )
         }
     ) { padding ->
@@ -40,7 +47,7 @@ fun ToplistScreen(
             when {
                 state.loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
                 state.error != null -> Text(
-                    state.error!!, color = MaterialTheme.colorScheme.error,
+                    state.error ?: "", color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.align(Alignment.Center).padding(24.dp)
                 )
                 else -> LazyColumn(Modifier.fillMaxSize()) {
@@ -81,7 +88,7 @@ fun ToplistScreen(
             }
             MiniPlayerBar(
                 player = LocalPlayerController.current,
-                onClick = { },
+                onClick = onOpenPlayer,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
         }

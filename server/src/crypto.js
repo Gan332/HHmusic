@@ -20,11 +20,8 @@ function rsaEncrypt(text) {
 }
 
 function createSecretKey(size) {
-  let key = "";
-  for (let i = 0; i < size; i++) {
-    key += base62[Math.floor(Math.random() * base62.length)];
-  }
-  return key;
+  const buf = crypto.randomBytes(size);
+  return [...buf].map((b) => base62[b % base62.length]).join("");
 }
 
 function aesEncrypt(plaintext, key) {
