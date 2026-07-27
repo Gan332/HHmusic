@@ -46,6 +46,7 @@ fun PlayerScreen(
 
     val favorites by store.favorites.collectAsState(initial = emptyList())
     val isFav = song?.let { s -> favorites.any { it.id == s.id } } ?: false
+    val waveProgress by store.waveProgress.collectAsState(initial = false)
 
     var showQueue by remember { mutableStateOf(false) }
 
@@ -116,7 +117,7 @@ fun PlayerScreen(
             Spacer(Modifier.height(8.dp))
 
             // Progress slider — isolated; only this recomposes with position.
-            ProgressSection(player = player)
+            ProgressSection(player = player, useWaveProgress = waveProgress)
 
             Spacer(Modifier.height(4.dp))
 
@@ -238,21 +239,33 @@ private fun LyricsSection(
 
 /** Isolated progress slider — recomposes per second without touching the rest of the player. */
 @Composable
-private fun ProgressSection(player: com.hh.music.player.playback.PlayerController) {
+private fun ProgressSection(player: com.hh.music.player.playback.PlayerController, useWaveProgress: Boolean = false) {
     val position by player.positionMs.collectAsState()
     val duration by player.durationMs.collectAsState()
     var seekValue by remember { mutableStateOf<Float?>(null) }
     val sliderPos = seekValue ?: (if (duration > 0) position.toFloat() / duration else 0f)
+
     Column(Modifier.fillMaxWidth()) {
-        Slider(
-            value = sliderPos.coerceIn(0f, 1f),
-            onValueChange = { seekValue = it },
-            onValueChangeFinished = {
-                seekValue?.let { player.seekTo((it * duration).toLong()) }
-                seekValue = null
-            },
-            modifier = Modifier.fillMaxWidth()
-        )
+        if (useWaveProgress) {
+            WaveProgressBar(
+                progress = sliderPos.coerceIn(0f, 1f),
+                onSeek = { frac ->
+                    seekValue = frac
+                    player.seekTo((frac * duration).toLong())
+                    seekValue = null
+                },
+            )
+        } else {
+            Slider(
+                value = sliderPos.coerceIn(0f, 1f),
+                onValueChange = { seekValue = it },
+                onValueChangeFinished = {
+                    seekValue?.let { player.seekTo((it * duration).toLong()) }
+                    seekValue = null
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(formatDuration(position), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(formatDuration(duration), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

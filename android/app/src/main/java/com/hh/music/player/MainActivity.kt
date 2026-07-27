@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.hh.music.player.ui.HHMusicNavHost
 import com.hh.music.player.ui.theme.HHMusicTheme
+import com.hh.music.player.ui.theme.parseHexColor
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -21,8 +22,15 @@ class MainActivity : ComponentActivity() {
             val app = application as HHMusicApp
             val store = app.container.localStore
             val isDarkTheme by store.isDarkTheme.collectAsState(initial = false)
+            val dynamicColor by store.dynamicColor.collectAsState(initial = true)
+            val themeColorHex by store.themeColor.collectAsState(initial = "#1DB954")
+            val seedColor = remember(themeColorHex) { parseHexColor(themeColorHex) }
 
-            HHMusicTheme(isDarkTheme = isDarkTheme) {
+            HHMusicTheme(
+                isDarkTheme = isDarkTheme,
+                dynamicColor = dynamicColor,
+                seedColor = seedColor,
+            ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

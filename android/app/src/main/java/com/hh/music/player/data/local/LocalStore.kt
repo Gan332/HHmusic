@@ -61,6 +61,14 @@ class LocalStore(private val context: Context) {
     val audioQuality: Flow<String> = context.dataStore.data.map { it[audioQualityKey] ?: "exhigh" }
     val playMode: Flow<String> = context.dataStore.data.map { it[playModeKey] ?: "sequence" }
 
+    // ---- Settings: dynamic color, theme seed color, wave progress bar ----
+    private val dynamicColorKey = booleanPreferencesKey("dynamic_color")
+    val dynamicColor: Flow<Boolean> = context.dataStore.data.map { it[dynamicColorKey] ?: true }
+    private val themeColorKey = stringPreferencesKey("theme_color")
+    val themeColor: Flow<String> = context.dataStore.data.map { it[themeColorKey] ?: "#1DB954" }
+    private val waveProgressKey = booleanPreferencesKey("wave_progress")
+    val waveProgress: Flow<Boolean> = context.dataStore.data.map { it[waveProgressKey] ?: false }
+
     // ---- Backend URL (customizable) ----
     private val backendUrlKey = stringPreferencesKey("backend_url")
     val backendUrl: Flow<String> = context.dataStore.data.map { it[backendUrlKey] ?: "http://10.0.2.2:3000/api/" }
@@ -113,6 +121,9 @@ class LocalStore(private val context: Context) {
     suspend fun setIsDarkTheme(value: Boolean) { context.dataStore.edit { it[isDarkThemeKey] = value } }
     suspend fun setAudioQuality(value: String) { context.dataStore.edit { it[audioQualityKey] = value } }
     suspend fun setBackendUrl(value: String) { context.dataStore.edit { it[backendUrlKey] = value } }
+    suspend fun setDynamicColor(value: Boolean) { context.dataStore.edit { it[dynamicColorKey] = value } }
+    suspend fun setThemeColor(value: String) { context.dataStore.edit { it[themeColorKey] = value } }
+    suspend fun setWaveProgress(value: Boolean) { context.dataStore.edit { it[waveProgressKey] = value } }
     suspend fun setPlayMode(mode: String) {
         context.dataStore.edit { it[playModeKey] = mode }
     }

@@ -22,8 +22,20 @@ class SettingsViewModel(private val store: LocalStore) : ViewModel() {
     val backendUrl: StateFlow<String> =
         store.backendUrl.stateIn(viewModelScope, SharingStarted.Eagerly, "http://10.0.2.2:3000/api/")
 
+    val dynamicColor: StateFlow<Boolean> =
+        store.dynamicColor.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    val themeColor: StateFlow<String> =
+        store.themeColor.stateIn(viewModelScope, SharingStarted.Eagerly, "#1DB954")
+
+    val waveProgress: StateFlow<Boolean> =
+        store.waveProgress.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     fun setUseBackend(value: Boolean) { viewModelScope.launch { store.setUseBackend(value) } }
     fun setAudioQuality(value: String) { viewModelScope.launch { store.setAudioQuality(value) } }
     fun setIsDarkTheme(value: Boolean) { viewModelScope.launch { store.setIsDarkTheme(value) } }
     fun setBackendUrl(value: String) { viewModelScope.launch { store.setBackendUrl(value) } }
+    fun setDynamicColor(value: Boolean) { viewModelScope.launch { store.setDynamicColor(value) } }
+    fun setThemeColor(value: String) { viewModelScope.launch { store.setThemeColor(value) } }
+    fun setWaveProgress(value: Boolean) { viewModelScope.launch { store.setWaveProgress(value) } }
 }
