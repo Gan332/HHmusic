@@ -262,7 +262,9 @@ class PlayerController(
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle(name)
+                    .setDisplayTitle(name)
                     .setArtist(artistText)
+                    .setSubtitle(artistText)
                     .setAlbumTitle(album.name)
                     .setArtworkUri(coverUrl.takeIf { it.startsWith("http") }?.let(Uri::parse))
                     .setIsBrowsable(false)
