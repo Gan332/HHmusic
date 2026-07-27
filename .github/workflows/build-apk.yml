@@ -192,13 +192,21 @@ jobs:
           generate_release_notes: true
 
       - name: Publish Debug APK to continuous release
-        if: success() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        if: success() && github.event_name != 'pull_request'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          TAG="continuous"
+          BRANCH="${{ github.head_ref || github.ref_name }}"
+          # Use "continuous" for main, "continuous-{branch}" for other branches
+          if [ "$BRANCH" = "main" ]; then
+            TAG="continuous"
+            TITLE="最新构建 (main)"
+          else
+            TAG="continuous-${BRANCH}"
+            TITLE="最新构建 (${BRANCH})"
+          fi
           REPO="${{ github.repository }}"
           APK="app/build/outputs/apk/debug/*.apk"
 
@@ -208,6 +216,6 @@ jobs:
           # Create new continuous release
           gh release create "$TAG" \
             --repo "$REPO" \
-            --title "最新构建 (${{ github.sha }})" \
+            --title "${TITLE}" \
             --notes "Commit: ${{ github.sha }}\n构建时间: $(date -u '+%Y-%m-%d %H:%M UTC')" \
             --prerelease $APK
