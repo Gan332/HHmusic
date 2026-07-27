@@ -1,11 +1,11 @@
 package com.hh.music.player.ui.theme
 
+import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Shapes
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 
 /**
@@ -19,15 +19,15 @@ import androidx.compose.ui.unit.dp
 @Stable
 class HHShapes(
     /** Extra small — chips, small badges, inner elements (e.g. 4dp). */
-    extraSmall: Shape,
+    extraSmall: CornerBasedShape,
     /** Small — buttons, text fields, search bars (e.g. 8dp). */
-    small: Shape,
+    small: CornerBasedShape,
     /** Medium — cards, dialogs, bottom sheets (e.g. 12dp). */
-    medium: Shape,
+    medium: CornerBasedShape,
     /** Large — modal sheets, side sheets, navigation drawers (e.g. 16dp). */
-    large: Shape,
+    large: CornerBasedShape,
     /** Extra large — FAB, player cover, hero images (e.g. 24dp). */
-    extraLarge: Shape,
+    extraLarge: CornerBasedShape,
 ) {
     val extraSmall by mutableStateOf(extraSmall)
     val small by mutableStateOf(small)
@@ -47,11 +47,11 @@ class HHShapes(
     companion object {
         /** Default M3 shape values. */
         fun default(
-            extraSmall: Shape = HHShapesDefaults.extraSmall,
-            small: Shape = HHShapesDefaults.small,
-            medium: Shape = HHShapesDefaults.medium,
-            large: Shape = HHShapesDefaults.large,
-            extraLarge: Shape = HHShapesDefaults.extraLarge,
+            extraSmall: CornerBasedShape = HHShapesDefaults.extraSmall,
+            small: CornerBasedShape = HHShapesDefaults.small,
+            medium: CornerBasedShape = HHShapesDefaults.medium,
+            large: CornerBasedShape = HHShapesDefaults.large,
+            extraLarge: CornerBasedShape = HHShapesDefaults.extraLarge,
         ): HHShapes = HHShapes(
             extraSmall = extraSmall,
             small = small,
@@ -63,9 +63,9 @@ class HHShapes(
 }
 
 object HHShapesDefaults {
-    val extraSmall: Shape = RoundedCornerShape(4.dp)
-    val small: Shape = RoundedCornerShape(8.dp)
-    val medium: Shape = RoundedCornerShape(12.dp)
-    val large: Shape = RoundedCornerShape(16.dp)
-    val extraLarge: Shape = RoundedCornerShape(24.dp)
+    val extraSmall: CornerBasedShape = RoundedCornerShape(4.dp)
+    val small: CornerBasedShape = RoundedCornerShape(8.dp)
+    val medium: CornerBasedShape = RoundedCornerShape(12.dp)
+    val large: CornerBasedShape = RoundedCornerShape(16.dp)
+    val extraLarge: CornerBasedShape = RoundedCornerShape(24.dp)
 }
