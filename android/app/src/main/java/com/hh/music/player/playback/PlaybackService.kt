@@ -1,15 +1,11 @@
 package com.hh.music.player.playback
 
-import android.app.Notification
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
-import androidx.core.app.NotificationCompat
-import androidx.media.app.MediaStyle
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -18,9 +14,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
-import com.hh.music.player.HHMusicApp
 import com.hh.music.player.MainActivity
-import com.hh.music.player.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -30,6 +24,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request as OkHttpRequest
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.TimeUnit
 
 /**
@@ -37,16 +32,15 @@ import java.util.concurrent.TimeUnit
  *
  * Integrates with all system media control centres — stock Android,
  * HarmonyOS (Huawei), MIUI (Xiaomi), ColorOS (OPPO), OriginOS (vivo) —
- * by providing a properly styled [MediaStyle] notification with album art.
+ * by loading album art into [MediaMetadata.artworkData] so that Media3's
+ * default notification automatically shows the cover image.
  */
 class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
-    private lateinit var notificationManager: NotificationManager
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var artworkJob: Job? = null
-    private var cachedArtwork: Bitmap? = null
 
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
@@ -55,7 +49,6 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
-        notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 
         val player = ExoPlayer.Builder(this)
             .setAudioAttributes(
@@ -68,11 +61,11 @@ class PlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .build()
 
-        // Observe media item changes to load artwork asynchronously
+        // Observe media item changes → load artwork and attach as artworkData
         player.addListener(
             object : Player.Listener {
                 override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                    loadArtwork(mediaItem?.mediaMetadata?.artworkUri)
+                    loadAndAttachArtwork(mediaItem?.mediaMetadata?.artworkUri, player)
                 }
             }
         )
@@ -92,43 +85,9 @@ class PlaybackService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
         mediaSession
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action != null && handleCustomAction(intent.action!!)) return START_STICKY
-        return super.onStartCommand(intent, flags, startId)
-    }
-
-    /**
-     * Handle custom action intents from notification buttons.
-     * @return true if the action was recognised and handled.
-     */
-    private fun handleCustomAction(action: String): Boolean {
-        val player = mediaSession?.player ?: return false
-        return when (action) {
-            ACTION_PLAY_PAUSE -> {
-                if (player.isPlaying) player.pause() else player.play()
-                true
-            }
-            ACTION_NEXT -> {
-                player.seekToNextMediaItem()
-                true
-            }
-            ACTION_PREVIOUS -> {
-                player.seekToPreviousMediaItem()
-                true
-            }
-            ACTION_STOP -> {
-                player.stop()
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                true
-            }
-            else -> false
-        }
-    }
-
-    /** Load album art from the URI and cache the bitmap for the notification. */
-    private fun loadArtwork(uri: Uri?) {
+    /** Load album art from URI and attach as [MediaMetadata.artworkData] on the current item. */
+    private fun loadAndAttachArtwork(uri: Uri?, player: Player) {
         artworkJob?.cancel()
-        cachedArtwork = null
         if (uri == null || !uri.toString().startsWith("http")) return
 
         artworkJob = serviceScope.launch {
@@ -140,74 +99,31 @@ class PlaybackService : MediaSessionService() {
                     }
                 } catch (_: Exception) { null }
             }
-            if (bytes != null) {
-                cachedArtwork = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                // Force notification refresh now that artwork is ready
-                mediaSession?.let { session ->
-                    val notification = buildNotification(session)
-                    notificationManager.notify(NOTIFICATION_ID, notification)
-                }
+            if (bytes == null) return@launch
+
+            // Compress to JPEG for smaller size
+            val compressed = withContext(Dispatchers.Default) {
+                try {
+                    val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    val out = ByteArrayOutputStream()
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 80, out)
+                    out.toByteArray()
+                } catch (_: Exception) { bytes }
+            }
+
+            val idx = player.currentMediaItemIndex
+            if (idx in 0 until player.mediaItemCount) {
+                val current = player.getMediaItemAt(idx)
+                val updated = current.buildUpon()
+                    .setMediaMetadata(
+                        current.mediaMetadata.buildUpon()
+                            .setArtworkData(compressed, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                            .build()
+                    )
+                    .build()
+                player.replaceMediaItem(idx, updated)
             }
         }
-    }
-
-    override fun onUpdateNotification(session: MediaSession): MediaNotification {
-        val notification = buildNotification(session)
-        return MediaNotification(NOTIFICATION_ID, notification)
-    }
-
-    private fun buildNotification(session: MediaSession): Notification {
-        val player = session.player
-        val metadata = player.currentMediaItem?.mediaMetadata ?: MediaMetadata.EMPTY
-        val isPlaying = player.isPlaying
-
-        // Play/pause action
-        val playPauseAction = if (isPlaying) {
-            NotificationCompat.Action(
-                android.R.drawable.ic_media_pause, "暂停",
-                serviceCommand(this, ACTION_PLAY_PAUSE)
-            )
-        } else {
-            NotificationCompat.Action(
-                android.R.drawable.ic_media_play, "播放",
-                serviceCommand(this, ACTION_PLAY_PAUSE)
-            )
-        }
-
-        return NotificationCompat.Builder(this, HHMusicApp.MEDIA_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_music_note)
-            .setContentTitle(metadata.title ?: metadata.displayTitle ?: "")
-            .setContentText(metadata.artist ?: metadata.subtitle ?: "")
-            .setSubText(metadata.albumTitle ?: "")
-            .setLargeIcon(cachedArtwork)
-            .setStyle(
-                MediaStyle()
-                    .setMediaSession(session.sessionCompatToken)
-                    .setShowActionsInCompactView(0, 1, 2)
-            )
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setOngoing(isPlaying)
-            .setShowWhen(false)
-            .addAction(
-                android.R.drawable.ic_media_previous, "上一首",
-                serviceCommand(this, ACTION_PREVIOUS)
-            )
-            .addAction(playPauseAction)
-            .addAction(
-                android.R.drawable.ic_media_next, "下一首",
-                serviceCommand(this, ACTION_NEXT)
-            )
-            .setContentIntent(
-                PendingIntent.getActivity(
-                    this, 0,
-                    Intent(this, MainActivity::class.java),
-                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-                )
-            )
-            .setDeleteIntent(
-                serviceCommand(this, ACTION_STOP)
-            )
-            .build()
     }
 
     override fun onDestroy() {
@@ -219,23 +135,5 @@ class PlaybackService : MediaSessionService() {
         artworkJob?.cancel()
         serviceScope.cancel()
         super.onDestroy()
-    }
-
-    companion object {
-        const val NOTIFICATION_ID = 1001
-
-        // Custom action strings (not system-defined)
-        const val ACTION_PLAY_PAUSE = "com.hh.music.player.PLAY_PAUSE"
-        const val ACTION_NEXT = "com.hh.music.player.NEXT"
-        const val ACTION_PREVIOUS = "com.hh.music.player.PREVIOUS"
-        const val ACTION_STOP = "com.hh.music.player.STOP"
-
-        /** Build a [PendingIntent] that starts [PlaybackService] with a custom action. */
-        private fun serviceCommand(context: Context, action: String): PendingIntent =
-            PendingIntent.getService(
-                context, action.hashCode(),
-                Intent(context, PlaybackService::class.java).setAction(action),
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-            )
     }
 }
