@@ -4,7 +4,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
@@ -63,7 +62,7 @@ fun ToplistScreen(
                                 AsyncImage(
                                     model = item.coverImgUrl,
                                     contentDescription = null,
-                                    modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp))
+                                    modifier = Modifier.size(56.dp).clip(MaterialTheme.shapes.small)
                                 )
                             }
                             Spacer(Modifier.width(12.dp))

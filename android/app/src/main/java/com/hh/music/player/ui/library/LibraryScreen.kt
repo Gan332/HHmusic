@@ -4,7 +4,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -63,7 +62,7 @@ fun LibraryScreen(
                             isPlaying = song.id == currentSong?.id && isPlaying,
                             onClick = { player.playQueue(favorites, index) }
                         )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                        HorizontalDivider()
                     }
                 }
 
@@ -79,7 +78,7 @@ fun LibraryScreen(
                             isPlaying = song.id == currentSong?.id && isPlaying,
                             onClick = { player.playQueue(recent, index) }
                         )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                        HorizontalDivider()
                     }
                 }
 
@@ -94,7 +93,7 @@ fun LibraryScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (pl.coverUrl.isNotBlank()) {
-                                AsyncImage(model = pl.coverUrl, contentDescription = null, modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)))
+                                AsyncImage(model = pl.coverUrl, contentDescription = null, modifier = Modifier.size(56.dp).clip(MaterialTheme.shapes.small))
                             }
                             Spacer(Modifier.width(12.dp))
                             Column {
@@ -102,7 +101,7 @@ fun LibraryScreen(
                                 Text(if (pl.creator.isNotBlank()) pl.creator else "未知创建者", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                        HorizontalDivider()
                     }
                 }
                 item { Spacer(Modifier.height(72.dp)) }

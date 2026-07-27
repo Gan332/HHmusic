@@ -99,7 +99,7 @@ fun PlaylistScreen(
                                 isPlaying = song.id == currentSong?.id && isPlaying,
                                 onClick = { playFrom(index) }
                             )
-                            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                            HorizontalDivider()
                         }
                         item { Spacer(Modifier.height(72.dp)) }
                     }

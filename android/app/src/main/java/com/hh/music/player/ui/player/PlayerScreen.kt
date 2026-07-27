@@ -5,7 +5,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
@@ -96,11 +95,11 @@ fun PlayerScreen(
             if (coverSong != null && coverSong.coverUrl.startsWith("http")) {
                 AsyncImage(
                     model = coverSong.coverUrl, contentDescription = null,
-                    modifier = Modifier.fillMaxWidth(0.7f).height(280.dp).clip(RoundedCornerShape(16.dp)).align(Alignment.CenterHorizontally)
+                    modifier = Modifier.fillMaxWidth(0.7f).height(280.dp).clip(MaterialTheme.shapes.large).align(Alignment.CenterHorizontally)
                 )
             } else {
                 Box(
-                    modifier = Modifier.fillMaxWidth(0.7f).height(280.dp).clip(RoundedCornerShape(16.dp)).align(Alignment.CenterHorizontally),
+                    modifier = Modifier.fillMaxWidth(0.7f).height(280.dp).clip(MaterialTheme.shapes.large).align(Alignment.CenterHorizontally),
                     contentAlignment = Alignment.Center
                 ) { Icon(Icons.Filled.MusicNote, contentDescription = null, modifier = Modifier.size(80.dp)) }
             }
@@ -148,7 +147,7 @@ fun PlayerScreen(
 
         // Queue drawer overlay
         if (showQueue) {
-            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background.copy(alpha = 0.95f)) {
+            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)) {
                 Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
                     Text("播放队列", style = MaterialTheme.typography.titleLarge)
                     Spacer(Modifier.height(8.dp))

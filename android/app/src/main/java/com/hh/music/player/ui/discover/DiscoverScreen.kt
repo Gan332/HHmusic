@@ -4,7 +4,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -79,7 +78,7 @@ fun DiscoverScreen(
                             isPlaying = song.id == currentSong?.id && isPlaying,
                             onClick = { if (state.recommend.isNotEmpty()) player.playQueue(state.recommend, index) }
                         )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                        HorizontalDivider()
                     }
 
                     // Section: 新歌速递
@@ -91,7 +90,7 @@ fun DiscoverScreen(
                             isPlaying = song.id == currentSong?.id && isPlaying,
                             onClick = { if (state.newSongs.isNotEmpty()) player.playQueue(state.newSongs, index) }
                         )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                        HorizontalDivider()
                     }
 
                     // Section: 推荐歌单
@@ -143,12 +142,12 @@ private fun PlaylistCard(item: RecommendPlaylistItem, modifier: Modifier = Modif
             AsyncImage(
                 model = item.coverUrl,
                 contentDescription = null,
-                modifier = Modifier.fillMaxWidth().height(120.dp).clip(RoundedCornerShape(10.dp))
+                modifier = Modifier.fillMaxWidth().height(120.dp).clip(MaterialTheme.shapes.medium)
             )
         } else {
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.fillMaxWidth().height(120.dp).clip(RoundedCornerShape(10.dp))
+                modifier = Modifier.fillMaxWidth().height(120.dp).clip(MaterialTheme.shapes.medium)
             ) {}
         }
         Text(

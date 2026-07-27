@@ -1,82 +1,62 @@
 package com.hh.music.player.ui.theme
 
+import android.os.Build
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 
 /**
- * HH Music theme entry point.
+ * HH Music theme entry point — full Material Design 3 implementation.
  *
- * Bridges the custom [HHTheme] system (colors, shapes, dimens) to
- * Material 3's [MaterialTheme] so existing components keep working
- * while new components can use [HHTheme.colors] / [HHTheme.shapes] /
- * [HHTheme.dimens] directly.
+ * ## Dynamic color (Material You)
+ * On Android 12+ (API 31) the colour scheme is derived from the user's
+ * wallpaper via [dynamicLightColorScheme] / [dynamicDarkColorScheme],
+ * giving every device a personalised look.
  *
- * Inspired by SaltUI's clean composition-local architecture:
- * - [HHColors] provides semantic roles (highlight, text, subText,
- *   background, subBackground, popup, stroke, surfaceTint, scrim).
- * - [HHShapes] provides consistent rounded-corner shapes.
- * - [HHDimens] provides a spacing system.
+ * On older devices (or when [dynamicColor] is explictly `false`) it falls
+ * back to the hand‑crafted NetEase‑green palette defined in [HHColors].
  *
- * @param isDarkTheme Whether to use the dark or light palette.
- * @param content The composable content tree.
+ * ## Sub‑systems
+ * - **Color** — all 30 M3 color roles (primary, secondary, tertiary,
+ *   error, neutral, inverse) mapped through [HHColors] or dynamic API.
+ * - **Typography** — the full 15‑style M3 type scale ([HHMusicTypography]).
+ * - **Shapes** — the 5‑tier M3 shape scale ([HHShapes]).
+ *
+ * @param isDarkTheme  Dark mode override.  Default follows system setting.
+ * @param dynamicColor Whether to use wallpaper‑derived colours (Android 12+).
+ *                     Default `true`.
+ * @param content      The composable content tree.
  */
 @Composable
 fun HHMusicTheme(
-    isDarkTheme: Boolean = false,
+    isDarkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val colors = if (isDarkTheme) darkHHColors() else lightHHColors()
-
-    // Bridge to Material 3 color slots so existing components work seamlessly.
-    val materialColorScheme = if (isDarkTheme) {
-        darkColorScheme(
-            primary = colors.highlight,
-            onPrimary = colors.onHighlight,
-            primaryContainer = colors.highlight.copy(alpha = 0.15f),
-            onPrimaryContainer = colors.highlight,
-            secondary = colors.highlight,
-            background = colors.background,
-            onBackground = colors.text,
-            surface = colors.subBackground,
-            onSurface = colors.text,
-            surfaceVariant = colors.surfaceTint,
-            onSurfaceVariant = colors.subText,
-            outline = colors.stroke,
-            outlineVariant = colors.stroke.copy(alpha = 0.5f),
-            scrim = colors.scrim,
-            error = Color(0xFFCF6679),
-        )
-    } else {
-        lightColorScheme(
-            primary = colors.highlight,
-            onPrimary = colors.onHighlight,
-            primaryContainer = colors.highlight.copy(alpha = 0.12f),
-            onPrimaryContainer = colors.highlight,
-            secondary = colors.highlight,
-            background = colors.background,
-            onBackground = colors.text,
-            surface = colors.subBackground,
-            onSurface = colors.text,
-            surfaceVariant = colors.surfaceTint,
-            onSurfaceVariant = colors.subText,
-            outline = colors.stroke,
-            outlineVariant = colors.stroke.copy(alpha = 0.5f),
-            scrim = colors.scrim,
-            error = Color(0xFFB3261E),
-        )
+    val colorScheme = when {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            val context = LocalContext.current
+            if (isDarkTheme) dynamicDarkColorScheme(context)
+            else dynamicLightColorScheme(context)
+        }
+        isDarkTheme -> darkHHColors().toDarkColorScheme()
+        else -> lightHHColors().toLightColorScheme()
     }
 
+    val shapes = HHShapes.default()
+
     HHThemeProvider(
-        colors = colors,
-        shapes = HHShapes.default(),
+        colors = if (isDarkTheme) darkHHColors() else lightHHColors(),
+        shapes = shapes,
         dimens = HHDimens.default(),
     ) {
         MaterialTheme(
-            colorScheme = materialColorScheme,
-            typography = MaterialTheme.typography,
+            colorScheme = colorScheme,
+            typography = HHMusicTypography,
+            shapes = shapes.toMaterialShapes(),
             content = content,
         )
     }
