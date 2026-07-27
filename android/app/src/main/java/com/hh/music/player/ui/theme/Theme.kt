@@ -106,7 +106,7 @@ private fun Color.toHsl(): Hsl {
 }
 
 /** Build a Compose [Color] from HSL components (hue 0‑360, saturation 0‑1, lightness 0‑1). */
-private fun Color.Companion.fromHsl(hsl: Hsl): Color {
+private fun Color.Companion.fromHsl(hsl: Hsl, alpha: Float = 1f): Color {
     var h = hsl.h % 360f; if (h < 0f) h += 360f
     val s = hsl.s.coerceIn(0f, 1f)
     val l = hsl.l.coerceIn(0f, 1f)
