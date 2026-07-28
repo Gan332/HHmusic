@@ -2,9 +2,10 @@ package com.hh.music.player.ui
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Leaderboard
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -12,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.compositionLocalOf
 
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -23,8 +25,6 @@ import com.hh.music.player.data.local.LocalStore
 import com.hh.music.player.playback.PlayerController
 import com.hh.music.player.ui.library.LibraryScreen
 import com.hh.music.player.ui.settings.SettingsScreen
-import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.Settings
 import com.hh.music.player.ui.discover.DiscoverScreen
 import com.hh.music.player.ui.player.PlayerScreen
 import com.hh.music.player.ui.playlist.PlaylistScreen
@@ -59,10 +59,10 @@ private data class TabItem(val route: String, val label: String, val icon: @Comp
 fun HHMusicNavHost(container: AppContainer) {
     val navController: NavHostController = rememberNavController()
     val tabs = listOf(
-        TabItem(Routes.DISCOVER, "发现") { Icon(Icons.Filled.Explore, contentDescription = null) },
-        TabItem(Routes.SEARCH, "搜索") { Icon(Icons.Filled.Search, contentDescription = null) },
-        TabItem(Routes.LIBRARY, "音乐库") { Icon(Icons.Filled.LibraryMusic, contentDescription = null) },
-        TabItem(Routes.SETTINGS, "设置") { Icon(Icons.Filled.Settings, contentDescription = null) }
+        TabItem(Routes.DISCOVER, "首页") { Icon(Icons.Filled.Home, contentDescription = null) },
+        TabItem(Routes.SEARCH, "发现") { Icon(Icons.Filled.Explore, contentDescription = null) },
+        TabItem(Routes.LIBRARY, "收藏") { Icon(Icons.Filled.Favorite, contentDescription = null) },
+        TabItem(Routes.SETTINGS, "设置") { Icon(Icons.Filled.Tune, contentDescription = null) }
     )
 
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -76,7 +76,10 @@ fun HHMusicNavHost(container: AppContainer) {
         Scaffold(
             bottomBar = {
                 if (showBottomBar) {
-                    NavigationBar {
+                    NavigationBar(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        tonalElevation = 0.dp
+                    ) {
                         tabs.forEach { tab ->
                             NavigationBarItem(
                                 selected = currentRoute == tab.route,
@@ -88,7 +91,14 @@ fun HHMusicNavHost(container: AppContainer) {
                                     }
                                 },
                                 icon = tab.icon,
-                                label = { Text(tab.label) }
+                                label = { Text(tab.label) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             )
                         }
                     }
@@ -104,6 +114,7 @@ fun HHMusicNavHost(container: AppContainer) {
                     DiscoverScreen(
                         repository = container.repository,
                         onOpenToplist = { navController.navigate(Routes.TOPLIST) },
+                        onOpenSearch = { navController.navigate(Routes.SEARCH) },
                         onOpenPlaylist = { id -> navController.navigate(Routes.playlist(id)) },
                         onOpenPlayer = { navController.navigate(Routes.PLAYER) }
                     )
