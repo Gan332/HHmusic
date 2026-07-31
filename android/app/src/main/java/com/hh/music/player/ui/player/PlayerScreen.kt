@@ -2,7 +2,7 @@ package com.hh.music.player.ui.player
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -210,8 +210,8 @@ private fun LyricsSection(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(vertical = 32.dp)
             ) {
-                items(lyricList) { line ->
-                    val active = lyricList.indexOf(line) == activeIndex
+                itemsIndexed(lyricList) { index, line ->
+                    val active = index == activeIndex
                     Text(
                         text = line.text.ifBlank { "♪" },
                         style = MaterialTheme.typography.bodyLarge,

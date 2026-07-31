@@ -1,13 +1,23 @@
+# ============================================================
+# HHMusic — R8 / ProGuard rules
+# ============================================================
+
 # Keep Kotlin metadata and serialization
--keepattributes *Annotation*, InnerClasses
+-keepattributes *Annotation*, InnerClasses, Signature, Exceptions
 -dontwarn kotlinx.serialization.**
 
--keepclassmembers class kotlinx.serialization.json.** {
+# kotlinx.serialization: keep serializers for @Serializable classes
+-keepclassmembers @kotlinx.serialization.Serializable class * {
     *** Companion;
-}
--keepclasseswithmembers class kotlinx.serialization.json.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
+-keepclasseswithmembers class com.hh.music.player.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-keep,includedescriptorclasses class com.hh.music.player.**$$serializer { *; }
+
+# kotlinx.coroutines
+-dontwarn kotlinx.coroutines.**
 
 # Media3 / ExoPlayer
 -dontwarn androidx.media3.**
@@ -15,5 +25,7 @@
 # Retrofit
 -dontwarn retrofit2.**
 -keep class retrofit2.** { *; }
--keepattributes Signature
--keepattributes Exceptions
+
+# OkHttp (ships its own consumer rules; keep just in case)
+-dontwarn okhttp3.**
+-dontwarn okio.**

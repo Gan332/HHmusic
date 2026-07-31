@@ -55,6 +55,10 @@ class PlayerController(
             runCatching { it.get() }.getOrNull()
         }
 
+    /** Queue waiting for the MediaController to finish connecting (played once connected). */
+    private var pendingQueue: Pair<List<Song>, Int>? = null
+    private var connectRetries = 0
+
     private val _queue = MutableStateFlow<List<Song>>(emptyList())
     val queue: StateFlow<List<Song>> = _queue.asStateFlow()
 
@@ -81,17 +85,37 @@ class PlayerController(
     /** id -> already-resolved playable url, so we don't re-fetch on every track revisit. */
     private val resolvedUrls = mutableMapOf<Long, String>()
 
+    /** ids whose URL resolution is still in flight (used to avoid auto-skipping them). */
+    private val resolvingIds = mutableSetOf<Long>()
+
     init {
         connect()
         startPositionPolling()
         observePersistedPlayMode()
     }
 
+    /**
+     * Connects to the playback service. On failure (e.g. service not yet started or
+     * temporarily unreachable) retries with an exponential backoff capped at ~32s
+     * instead of busy-looping every 300ms like v1.3 did.
+     */
     private fun connect() {
         val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
         controllerFuture = MediaController.Builder(context, token).buildAsync()
         controllerFuture?.addListener({
-            controller?.let(::wireListener)
+            val c = controller
+            if (c != null) {
+                connectRetries = 0
+                wireListener(c)
+                pendingQueue?.let { (songs, idx) ->
+                    pendingQueue = null
+                    playQueue(songs, idx)
+                }
+            } else {
+                val backoffMs = 1000L shl connectRetries.coerceAtMost(5)
+                connectRetries++
+                scope.launch { delay(backoffMs); connect() }
+            }
         }, ContextCompat.getMainExecutor(context))
     }
 
@@ -107,6 +131,7 @@ class PlayerController(
                     resolveUrlFor(it)
                     recordRecent(it)
                 }
+                prefetchNext()
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _isPlaying.value = isPlaying
@@ -114,6 +139,17 @@ class PlayerController(
             override fun onPlaybackStateChanged(state: Int) {
                 // Reflect true duration only when known.
                 if (c.duration > 0) _durationMs.value = c.duration
+            }
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                // Failure safety net: if the current item's URL is still being resolved
+                // (placeholder not swapped yet), give it one more chance; otherwise skip
+                // to the next track instead of silently stopping playback.
+                val song = _queue.value.getOrNull(c.currentMediaItemIndex)
+                if (song != null && resolvingIds.remove(song.id)) {
+                    c.prepare()
+                } else if (c.mediaItemCount > 1) {
+                    c.seekToNextMediaItem()
+                }
             }
         }.also { c.addListener(it) }
         applyPlayModeToPlayer()
@@ -180,14 +216,18 @@ class PlayerController(
         recordRecent(songs[startIndex])
         val c = controller
         if (c == null) {
-            scope.launch { delay(300); playQueue(songs, startIndex) }
+            // Controller not connected yet — queue the request and let connect() replay
+            // it once, instead of retrying in a tight loop every 300ms.
+            pendingQueue = songs to startIndex
             return
         }
+        pendingQueue = null
         c.setMediaItems(songs.map { it.toMediaItem(it.resolvedOrPlaceholder()) }, startIndex, 0L)
         applyPlayModeToPlayer()
         c.prepare()
         c.playWhenReady = true
         resolveUrlFor(songs[startIndex])
+        prefetchNext()
     }
 
     fun togglePlayPause() {
@@ -215,8 +255,12 @@ class PlayerController(
         // Reuse a cached url so re-visiting a track is instant and buffer-free.
         resolvedUrls[song.id]?.let { return }
         scope.launch {
-            val result = repository.songUrl(song.id)
-            val url = result.getOrNull()?.url
+            resolvingIds += song.id
+            val url = try {
+                repository.songUrl(song.id).getOrNull()?.url
+            } finally {
+                resolvingIds -= song.id
+            }
             if (url.isNullOrBlank()) return@launch
             val c = controller ?: return@launch
             resolvedUrls[song.id] = url
@@ -228,6 +272,21 @@ class PlayerController(
                 c.replaceMediaItem(idx, updated)
             }
         }
+    }
+
+    /**
+     * Pre-resolve the next track's URL so switching is buffer-free. Respects the
+     * current play mode: sequence → next index, shuffle → random, repeat-one → none.
+     */
+    private fun prefetchNext() {
+        val queue = _queue.value
+        if (queue.size < 2) return
+        val nextIndex = when (_playMode.value) {
+            PlayMode.REPEAT_ONE -> null
+            PlayMode.SHUFFLE -> queue.indices.filter { it != _currentIndex.value }.randomOrNull()
+            PlayMode.SEQUENCE -> (_currentIndex.value + 1).takeIf { it < queue.size }
+        } ?: return
+        queue.getOrNull(nextIndex)?.let { resolveUrlFor(it) }
     }
 
     private fun Song.resolvedOrPlaceholder(): String = resolvedUrls[id] ?: "placeholder://$id"

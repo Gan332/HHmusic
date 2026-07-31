@@ -37,11 +37,17 @@ class MusicRepository(
         private const val TAG = "HHMusicRepo"
     }
 
+    // Small in-memory LRU caches: lyrics are re-opened every time you re-visit the
+    // player screen, and search results are re-fetched on every keystroke debounce.
+    private val lyricCache = LruCache<Long, Lyric>(30)
+    private val searchCache = LruCache<String, List<Song>>(30)
+
     // ---------------- direct (NetEase) implementations ----------------
 
     suspend fun search(keyword: String, limit: Int = 30, offset: Int = 0): Result<List<Song>> =
         runCatching {
-            withContext(Dispatchers.IO) {
+            searchCache[keyword]?.let { return@runCatching it }
+            val songs = withContext(Dispatchers.IO) {
                 if (useBackend) {
                     api.search(keyword, limit, offset).songs
                 } else {
@@ -55,6 +61,8 @@ class MusicRepository(
                     NcmParser.searchSongs(JSONObject(body))
                 }
             }
+            searchCache[keyword] = songs
+            songs
         }
 
     suspend fun songDetail(ids: List<Long>): Result<List<Song>> = runCatching {
@@ -101,7 +109,8 @@ class MusicRepository(
     }
 
     suspend fun lyric(id: Long): Result<Lyric> = runCatching {
-        withContext(Dispatchers.IO) {
+        lyricCache[id]?.let { return@runCatching it }
+        val lrc = withContext(Dispatchers.IO) {
             if (useBackend) {
                 api.lyric(id)
             } else {
@@ -120,6 +129,8 @@ class MusicRepository(
                 )
             }
         }
+        lyricCache[id] = lrc
+        lrc
     }
 
     suspend fun playlistDetail(id: Long): Result<Playlist> = runCatching {
@@ -241,5 +252,21 @@ class AppContainer(context: Context) {
     init {
         scope.launch { localStore.useBackend.collect { repository.useBackend = it } }
         scope.launch { localStore.audioQuality.collect { repository.audioQuality = it } }
+    }
+}
+
+/** Tiny thread-safe LRU map used for in-memory response caches. */
+private class LruCache<K, V>(maxEntries: Int) {
+    private val map = object : LinkedHashMap<K, V>(maxEntries * 2, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<K, V>): Boolean =
+            size > maxEntries
+    }
+
+    @Synchronized
+    fun get(key: K): V? = map[key]
+
+    @Synchronized
+    fun put(key: K, value: V) {
+        map[key] = value
     }
 }
