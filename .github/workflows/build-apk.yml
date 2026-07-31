@@ -125,6 +125,13 @@ jobs:
           ./gradlew assembleDebug --stacktrace 2>&1 | tee ../build.log
           exit ${PIPESTATUS[0]}
 
+      - name: Build unsigned Release APK (R8 verification)
+        if: success() && steps.build.outcome == 'success'
+        shell: bash
+        run: |
+          ./gradlew assembleRelease 2>&1 | tee ../release.log
+          exit ${PIPESTATUS[0]}
+
       - name: Show build errors on failure
         if: steps.build.outcome == 'failure'
         shell: bash
@@ -173,6 +180,14 @@ jobs:
           name: HHMusic-debug-${{ github.sha }}
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      - name: Upload unsigned Release APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HHMusic-release-unsigned-${{ github.sha }}
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: ignore
 
       - name: Upload Release APK
         if: success() && steps.keystore.outputs.has_keystore == 'true'
