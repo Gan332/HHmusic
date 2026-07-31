@@ -263,10 +263,10 @@ private class LruCache<K, V>(maxEntries: Int) {
     }
 
     @Synchronized
-    fun get(key: K): V? = map[key]
+    operator fun get(key: K): V? = map[key]
 
     @Synchronized
-    fun put(key: K, value: V) {
+    operator fun set(key: K, value: V) {
         map[key] = value
     }
 }
