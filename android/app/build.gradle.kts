@@ -46,6 +46,11 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    // AGP 8.7 lint is incompatible with Kotlin 2.1 (IncompatibleClassChangeError in
+    // lint analysis); release step in CI is only for R8 verification, so skip lint there.
+    lint {
+        checkReleaseBuilds = false
+    }
 }
 
 dependencies {
