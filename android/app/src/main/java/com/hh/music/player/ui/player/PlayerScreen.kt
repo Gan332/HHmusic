@@ -352,7 +352,7 @@ private fun ProgressSection(
  * 独立成 composable，避免位置每秒刷新影响整行控制区。
  */
 @Composable
-private fun CircularPlayButton(
+private fun RowScope.CircularPlayButton(
     player: com.hh.music.player.playback.PlayerController,
     isPlaying: Boolean,
     style: ProgressStyle

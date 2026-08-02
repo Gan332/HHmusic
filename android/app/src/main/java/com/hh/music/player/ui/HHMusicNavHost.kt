@@ -1,12 +1,12 @@
 package com.hh.music.player.ui
 
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
@@ -15,7 +15,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.compositionLocalOf
 
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.navArgument
@@ -80,11 +79,7 @@ fun HHMusicNavHost(container: AppContainer) {
         LocalStoreProvider provides container.localStore
     ) {
     NavigationSuiteScaffold(
-        navigationSuiteType = NavigationSuiteType.NavigationBar,
-        navigationSuiteColors = NavigationSuiteDefaults.colors(
-            navigationBarContainerColor = MaterialTheme.colorScheme.surfaceContainer
-        ),
-        navigationItems = {
+        navigationSuiteItems = {
             tabs.forEach { tab ->
                 item(
                     selected = currentRoute == tab.route,
@@ -100,8 +95,12 @@ fun HHMusicNavHost(container: AppContainer) {
                     alwaysShowLabel = true
                 )
             }
-        }
-    ) { innerPadding ->
+        },
+        layoutType = NavigationSuiteType.NavigationBar,
+        navigationSuiteColors = NavigationSuiteDefaults.colors(
+            navigationBarContainerColor = MaterialTheme.colorScheme.surfaceContainer
+        )
+    ) {
         NavHost(
             navController = navController,
             startDestination = Routes.DISCOVER,
