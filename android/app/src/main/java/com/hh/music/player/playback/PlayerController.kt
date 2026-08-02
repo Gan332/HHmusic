@@ -252,6 +252,8 @@ class PlayerController(
     }
 
     private fun resolveUrlFor(song: Song) {
+        // Local files play directly from their content:// uri; no network resolution needed.
+        if (song.isLocal) return
         // Reuse a cached url so re-visiting a track is instant and buffer-free.
         resolvedUrls[song.id]?.let { return }
         scope.launch {
@@ -289,7 +291,8 @@ class PlayerController(
         queue.getOrNull(nextIndex)?.let { resolveUrlFor(it) }
     }
 
-    private fun Song.resolvedOrPlaceholder(): String = resolvedUrls[id] ?: "placeholder://$id"
+    private fun Song.resolvedOrPlaceholder(): String =
+        localUri ?: resolvedUrls[id] ?: "placeholder://$id"
 
     private fun Song.toMediaItem(uri: String = "placeholder://$id"): MediaItem =
         MediaItem.Builder()

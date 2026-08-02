@@ -1,6 +1,7 @@
 package com.hh.music.player.ui.discover
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,24 +19,23 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DockedSearchBar
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
@@ -47,9 +47,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,8 +62,6 @@ import com.hh.music.player.network.RecommendPlaylistItem
 import com.hh.music.player.ui.LocalPlayerController
 import com.hh.music.player.ui.components.MiniPlayerBar
 
-private val HOT_SEARCHES = listOf("周杰伦", "林俊杰", "陈奕迅", "许嵩", "毛不易", "邓紫棋")
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiscoverScreen(
@@ -81,7 +76,6 @@ fun DiscoverScreen(
     val player = LocalPlayerController.current
     val currentSong by player.currentSong.collectAsState()
     val isPlaying by player.isPlaying.collectAsState()
-    var searchActive by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -111,52 +105,32 @@ fun DiscoverScreen(
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                DockedSearchBar(
-                    query = "",
-                    onQueryChange = {},
-                    onSearch = { kw -> onSearch(kw) },
-                    active = searchActive,
-                    onActiveChange = { searchActive = it },
-                    placeholder = { Text("搜索歌曲、歌手或歌单") },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                    trailingIcon = {
-                        if (searchActive) {
-                            IconButton(onClick = { searchActive = false }) {
-                                Icon(Icons.Filled.Close, contentDescription = "收起")
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
+                // 折叠态 M3E 搜索入口：点击直接进入全屏搜索页，避免内联展开导致错位。
+                Surface(
+                    shape = SearchBarDefaults.dockedShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    tonalElevation = SearchBarDefaults.TonalElevation,
+                    shadowElevation = SearchBarDefaults.ShadowElevation,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .clickable { onSearch("") }
                 ) {
-                    Text(
-                        "热门搜索",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-                    )
-                    HOT_SEARCHES.forEach { kw ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(MaterialTheme.shapes.small)
-                                .padding(horizontal = 16.dp, vertical = 12.dp)
-                        ) {
-                            Icon(
-                                Icons.Filled.Search,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Text(
-                                kw,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(Modifier.weight(1f))
-                            FilledTonalButton(onClick = { onSearch(kw) }) { Text("搜索") }
-                        }
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Filled.Search,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            "搜索歌曲、歌手或歌单",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }

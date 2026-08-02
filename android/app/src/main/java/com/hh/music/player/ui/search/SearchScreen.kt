@@ -1,6 +1,8 @@
 package com.hh.music.player.ui.search
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -22,6 +24,8 @@ import com.hh.music.player.ui.LocalStoreProvider
 import com.hh.music.player.ui.components.MiniPlayerBar
 import com.hh.music.player.ui.components.SongRow
 import kotlinx.coroutines.launch
+
+private val HOT_SEARCHES = listOf("周杰伦", "林俊杰", "陈奕迅", "许嵩", "毛不易", "邓紫棋")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,12 +50,11 @@ fun SearchScreen(
         if (list.isNotEmpty()) player.playQueue(list, index)
     }
 
-    // 从首页热搜跳转过来时，自动展开并搜索关键词。
+    // 从首页热搜跳转过来时，自动填充并搜索关键词。
     LaunchedEffect(initialQuery) {
         if (initialQuery.isNotBlank()) {
             actualVm.onQueryChange(initialQuery)
             actualVm.submitSearch(initialQuery)
-            searchBarState.animateToExpanded()
         }
     }
 
@@ -107,8 +110,9 @@ fun SearchScreen(
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.align(Alignment.Center).padding(24.dp)
                     )
-                    state.query.isBlank() -> SearchHistorySection(
+                    state.query.isBlank() -> SearchSuggestionsSection(
                         history = history,
+                        hotSearches = HOT_SEARCHES,
                         onPick = { kw ->
                             actualVm.onQueryChange(kw)
                             actualVm.submitSearch(kw)
@@ -154,8 +158,9 @@ fun SearchScreen(
                 state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
-                state.query.isBlank() -> SearchHistorySection(
+                state.query.isBlank() -> SearchSuggestionsSection(
                     history = history,
+                    hotSearches = HOT_SEARCHES,
                     onPick = { kw ->
                         actualVm.onQueryChange(kw)
                         actualVm.submitSearch(kw)
@@ -189,61 +194,87 @@ fun SearchScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SearchHistorySection(
+private fun SearchSuggestionsSection(
     history: List<String>,
+    hotSearches: List<String>,
     onPick: (String) -> Unit,
     onClear: () -> Unit
 ) {
-    if (history.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("输入关键词开始搜索", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        return
-    }
-    Column(Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        // M3E 热搜词
+        Text(
+            "热门搜索",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+        FlowRow(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(
-                Icons.Filled.History,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                "搜索历史",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.weight(1f)
-            )
-            TextButton(onClick = onClear) { Text("清空") }
+            hotSearches.forEach { kw ->
+                FilterChip(
+                    selected = false,
+                    onClick = { onPick(kw) },
+                    label = { Text(kw) }
+                )
+            }
         }
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-            history.forEach { kw ->
-                Row(
-                    modifier = Modifier.fillMaxWidth().clickable { onPick(kw) }.padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        shape = CircleShape,
-                        modifier = Modifier.size(32.dp)
+        if (history.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Filled.History,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "搜索历史",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = onClear) { Text("清空") }
+            }
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                history.forEach { kw ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { onPick(kw) }.padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                Icons.Filled.History,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shape = CircleShape,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Filled.History,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
                         }
+                        Spacer(Modifier.width(12.dp))
+                        Text(kw, color = MaterialTheme.colorScheme.onSurface)
                     }
-                    Spacer(Modifier.width(12.dp))
-                    Text(kw, color = MaterialTheme.colorScheme.onSurface)
                 }
+            }
+        } else {
+            Box(
+                Modifier.fillMaxWidth().padding(top = 48.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("输入关键词开始搜索", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

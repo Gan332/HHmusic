@@ -44,6 +44,12 @@ class LocalStore(private val context: Context) {
         p[historyKey]?.let { runCatching { json.decodeFromString(ListSerializer(serializer<String>()), it) }.getOrNull() } ?: emptyList()
     }
 
+    // ---- Imported local audio files (SAF content:// uris) ----
+    private val importedUrisKey = stringPreferencesKey("imported_uris")
+    val importedUris: Flow<List<String>> = context.dataStore.data.map { p ->
+        p[importedUrisKey]?.let { runCatching { json.decodeFromString(ListSerializer(serializer<String>()), it) }.getOrNull() } ?: emptyList()
+    }
+
     // ---- Saved playlists (as ToplistItem-like entries) ----
     private val savedPlaylistsKey = stringPreferencesKey("saved_playlists")
     val savedPlaylists: Flow<List<SavedPlaylist>> = context.dataStore.data.map { p ->
@@ -95,6 +101,22 @@ class LocalStore(private val context: Context) {
 
     suspend fun clearSearchHistory() {
         context.dataStore.edit { it[historyKey] = json.encodeToString(ListSerializer(serializer<String>()), emptyList()) }
+    }
+
+    suspend fun addImportedUris(uris: List<String>) {
+        if (uris.isEmpty()) return
+        context.dataStore.edit { p ->
+            val cur = p[importedUrisKey]?.let { runCatching { json.decodeFromString(ListSerializer(serializer<String>()), it) }.getOrNull() } ?: emptyList()
+            val next = (uris + cur).distinct()
+            p[importedUrisKey] = json.encodeToString(ListSerializer(serializer<String>()), next)
+        }
+    }
+
+    suspend fun removeImportedUri(uri: String) {
+        context.dataStore.edit { p ->
+            val cur = p[importedUrisKey]?.let { runCatching { json.decodeFromString(ListSerializer(serializer<String>()), it) }.getOrNull() } ?: emptyList()
+            p[importedUrisKey] = json.encodeToString(ListSerializer(serializer<String>()), cur.filter { it != uri })
+        }
     }
 
     suspend fun toggleSavedPlaylist(playlist: SavedPlaylist) {

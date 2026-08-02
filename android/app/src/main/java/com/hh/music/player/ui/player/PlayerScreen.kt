@@ -14,7 +14,10 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
@@ -27,6 +30,8 @@ import com.hh.music.player.playback.PlayMode
 import com.hh.music.player.ui.LocalPlayerController
 import com.hh.music.player.ui.LocalStoreProvider
 import com.hh.music.player.ui.ProgressStyle
+import com.hh.music.player.ui.components.WaveformSlider
+import com.hh.music.player.ui.components.rememberWaveformAmplitudes
 import com.hh.music.player.ui.components.SongRow
 import com.hh.music.player.ui.components.formatDuration
 import kotlinx.coroutines.launch
@@ -68,7 +73,28 @@ fun PlayerScreen(
         PlayMode.SHUFFLE -> "随机播放"
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        // SPICaMusic style: blurred cover as the page background with a scrim.
+        val coverUrl = song?.coverUrl.orEmpty()
+        if (coverUrl.startsWith("http")) {
+            AsyncImage(
+                model = coverUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(48.dp)
+                    .scale(1.15f)
+                    .alpha(0.38f)
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.78f))
+            )
+        } else {
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface))
+        }
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             // Top bar (does NOT read position -> stable unless song/playing changes)
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -167,7 +193,7 @@ fun PlayerScreen(
             Spacer(Modifier.height(8.dp))
 
             // Progress slider — isolated; only this recomposes with position.
-            ProgressSection(player = player, style = progressStyle)
+            ProgressSection(player = player, style = progressStyle, songId = song?.id ?: 0L)
 
             Spacer(Modifier.height(4.dp))
 
@@ -176,42 +202,47 @@ fun PlayerScreen(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TooltipBox(
-                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                    tooltip = { PlainTooltip { Text(playModeDesc) } },
-                    state = rememberTooltipState(),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    IconButton(onClick = { player.cyclePlayMode() }) {
-                        Icon(playModeIcon, contentDescription = playModeDesc, tint = MaterialTheme.colorScheme.primary)
+                // Each control sits in an equal-width, centered slot so the row never drifts.
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    TooltipBox(
+                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                        tooltip = { PlainTooltip { Text(playModeDesc) } },
+                        state = rememberTooltipState()
+                    ) {
+                        IconButton(onClick = { player.cyclePlayMode() }) {
+                            Icon(playModeIcon, contentDescription = playModeDesc, tint = MaterialTheme.colorScheme.primary)
+                        }
                     }
                 }
-                TooltipBox(
-                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                    tooltip = { PlainTooltip { Text("上一首") } },
-                    state = rememberTooltipState(),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    FilledTonalIconButton(onClick = { player.playPrevious() }, modifier = Modifier.size(52.dp)) {
-                        Icon(Icons.Filled.SkipPrevious, contentDescription = "上一首", modifier = Modifier.size(28.dp))
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    TooltipBox(
+                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                        tooltip = { PlainTooltip { Text("上一首") } },
+                        state = rememberTooltipState()
+                    ) {
+                        FilledTonalIconButton(onClick = { player.playPrevious() }, modifier = Modifier.size(52.dp)) {
+                            Icon(Icons.Filled.SkipPrevious, contentDescription = "上一首", modifier = Modifier.size(28.dp))
+                        }
                     }
                 }
-                CircularPlayButton(
-                    player = player,
-                    isPlaying = isPlaying,
-                    style = progressStyle
-                )
-                TooltipBox(
-                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                    tooltip = { PlainTooltip { Text("下一首") } },
-                    state = rememberTooltipState(),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    FilledTonalIconButton(onClick = { player.playNext() }, modifier = Modifier.size(52.dp)) {
-                        Icon(Icons.Filled.SkipNext, contentDescription = "下一首", modifier = Modifier.size(28.dp))
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    CircularPlayButton(
+                        player = player,
+                        isPlaying = isPlaying,
+                        style = progressStyle
+                    )
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    TooltipBox(
+                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                        tooltip = { PlainTooltip { Text("下一首") } },
+                        state = rememberTooltipState()
+                    ) {
+                        FilledTonalIconButton(onClick = { player.playNext() }, modifier = Modifier.size(52.dp)) {
+                            Icon(Icons.Filled.SkipNext, contentDescription = "下一首", modifier = Modifier.size(28.dp))
+                        }
                     }
                 }
-                Box(Modifier.weight(1f))
             }
         }
     }
@@ -313,7 +344,8 @@ private fun LyricsSection(
 @Composable
 private fun ProgressSection(
     player: com.hh.music.player.playback.PlayerController,
-    style: ProgressStyle
+    style: ProgressStyle,
+    songId: Long
 ) {
     val position by player.positionMs.collectAsState()
     val duration by player.durationMs.collectAsState()
@@ -339,6 +371,16 @@ private fun ProgressSection(
                 strokeCap = StrokeCap.Round
             )
             ProgressStyle.CIRCULAR -> Unit
+            ProgressStyle.WAVEFORM -> WaveformSlider(
+                progress = fraction,
+                onProgressChange = { seekValue = it },
+                onProgressChangeFinished = {
+                    seekValue?.let { player.seekTo((it * duration).toLong()) }
+                    seekValue = null
+                },
+                amplitudes = rememberWaveformAmplitudes(songId),
+                modifier = Modifier.fillMaxWidth().height(44.dp)
+            )
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(formatDuration(position), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -352,7 +394,7 @@ private fun ProgressSection(
  * 独立成 composable，避免位置每秒刷新影响整行控制区。
  */
 @Composable
-private fun RowScope.CircularPlayButton(
+private fun CircularPlayButton(
     player: com.hh.music.player.playback.PlayerController,
     isPlaying: Boolean,
     style: ProgressStyle
@@ -360,7 +402,7 @@ private fun RowScope.CircularPlayButton(
     if (style != ProgressStyle.CIRCULAR) {
         FilledIconButton(
             onClick = { player.togglePlayPause() },
-            modifier = Modifier.weight(1f).size(68.dp)
+            modifier = Modifier.size(68.dp)
         ) {
             Icon(
                 if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -375,7 +417,7 @@ private fun RowScope.CircularPlayButton(
     val duration by player.durationMs.collectAsState()
     val fraction = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
     Box(
-        modifier = Modifier.weight(1f).size(88.dp),
+        modifier = Modifier.size(88.dp),
         contentAlignment = Alignment.Center
     ) {
         CircularProgressIndicator(

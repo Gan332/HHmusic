@@ -14,13 +14,17 @@ data class Song(
     val artists: List<Artist> = emptyList(),
     val album: Album = Album(),
     val duration: Long = 0L,      // milliseconds
-    val fee: Int = 0               // 0 free, 1 vip, 4 album-only, 8 trial
+    val fee: Int = 0,              // 0 free, 1 vip, 4 album-only, 8 trial
+    val localUri: String? = null   // non-null for local/imported audio files
 ) {
     val artistText: String
         get() = artists.joinToString(", ") { it.name }.ifBlank { "未知艺术家" }
 
     val coverUrl: String
         get() = album.picUrl?.ifBlank { null } ?: ""
+
+    val isLocal: Boolean
+        get() = !localUri.isNullOrBlank()
 }
 
 @Serializable
