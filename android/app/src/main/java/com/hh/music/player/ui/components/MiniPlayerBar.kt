@@ -39,54 +39,65 @@ fun MiniPlayerBar(
         val current = song ?: return@AnimatedVisibility
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 0.dp,
-            shape = MaterialTheme.shapes.medium,
+            tonalElevation = 3.dp,
+            shadowElevation = 6.dp,
+            shape = MaterialTheme.shapes.extraLarge,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp)
+                .padding(horizontal = 12.dp, vertical = 6.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onClick)
-                    .padding(start = 8.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (current.coverUrl.startsWith("http")) {
-                    AsyncImage(
-                        model = current.coverUrl,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(46.dp)
-                            .clip(MaterialTheme.shapes.small)
-                    )
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onClick)
+                        .padding(start = 8.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (current.coverUrl.startsWith("http")) {
+                        AsyncImage(
+                            model = current.coverUrl,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(46.dp)
+                                .clip(MaterialTheme.shapes.medium)
+                        )
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            current.name,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            current.artistText,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    androidx.compose.material3.FilledTonalIconButton(onClick = { player.togglePlayPause() }) {
+                        Icon(
+                            if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (isPlaying) "暂停" else "播放",
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                    IconButton(onClick = { player.playNext() }) {
+                        Icon(Icons.Filled.SkipNext, contentDescription = "下一首", tint = MaterialTheme.colorScheme.onSurface)
+                    }
                 }
-                Spacer(Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        current.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurface
+                if (current.duration > 0) {
+                    val progress by player.positionMs.collectAsState()
+                    LinearProgressIndicator(
+                        progress = { (progress.toFloat() / current.duration).coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
                     )
-                    Text(
-                        current.artistText,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                IconButton(onClick = { player.togglePlayPause() }) {
-                    Icon(
-                        if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (isPlaying) "暂停" else "播放",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                IconButton(onClick = { player.playNext() }) {
-                    Icon(Icons.Filled.SkipNext, contentDescription = "下一首", tint = MaterialTheme.colorScheme.onSurface)
                 }
             }
         }

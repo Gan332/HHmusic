@@ -7,12 +7,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.hh.music.player.data.MusicRepository
 import com.hh.music.player.data.SavedPlaylist
 import com.hh.music.player.ui.LocalPlayerController
@@ -48,6 +54,7 @@ fun PlaylistScreen(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
                 title = { Text(playlist?.name ?: "歌单") },
@@ -57,58 +64,140 @@ fun PlaylistScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = {
-                        val p = playlist ?: return@IconButton
-                        scope.launch {
-                            store.toggleSavedPlaylist(
-                                SavedPlaylist(
-                                    id = p.id,
-                                    name = p.name,
-                                    coverUrl = p.coverImgUrl ?: "",
-                                    creator = p.creator?.nickname ?: ""
+                    TooltipBox(
+                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                        tooltip = {
+                            PlainTooltip {
+                                Text(if (isSaved) "取消收藏" else "收藏歌单")
+                            }
+                        },
+                        state = rememberTooltipState()
+                    ) {
+                        IconButton(onClick = {
+                            val p = playlist ?: return@IconButton
+                            scope.launch {
+                                store.toggleSavedPlaylist(
+                                    SavedPlaylist(
+                                        id = p.id,
+                                        name = p.name,
+                                        coverUrl = p.coverImgUrl ?: "",
+                                        creator = p.creator?.nickname ?: ""
+                                    )
                                 )
+                            }
+                        }) {
+                            Icon(
+                                if (isSaved) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                contentDescription = "收藏歌单",
+                                tint = if (isSaved) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    }) {
-                        Icon(
-                            if (isSaved) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                            contentDescription = "收藏歌单",
-                            tint = if (isSaved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 }
             )
         }
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            when {
-                state.loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-                state.error != null -> Text(
-                    state.error!!, color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.align(Alignment.Center).padding(24.dp)
-                )
-                else -> {
-                    val tracks = playlist?.tracks.orEmpty()
-                    LazyColumn(Modifier.fillMaxSize()) {
-                        itemsIndexed(tracks) { index, song ->
-                            SongRow(
-                                song = song,
-                                index = index,
-                                isActive = song.id == currentSong?.id,
-                                isPlaying = song.id == currentSong?.id && isPlaying,
-                                onClick = { playFrom(index) }
-                            )
-                            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+        PullToRefreshBox(
+            isRefreshing = state.loading,
+            onRefresh = { vm.load(playlistId) },
+            modifier = Modifier.fillMaxSize().padding(padding)
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                when {
+                    state.loading && playlist == null ->
+                        CircularProgressIndicator(Modifier.align(Alignment.Center))
+                    state.error != null -> Text(
+                        state.error!!,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.align(Alignment.Center).padding(24.dp)
+                    )
+                    else -> {
+                        val tracks = playlist?.tracks.orEmpty()
+                        LazyColumn(Modifier.fillMaxSize()) {
+                            if (playlist != null) {
+                                item {
+                                    PlaylistHeader(
+                                        coverUrl = playlist.coverImgUrl.orEmpty(),
+                                        name = playlist.name,
+                                        creator = playlist.creator?.nickname.orEmpty(),
+                                        trackCount = tracks.size,
+                                        onPlayAll = { playFrom(0) }
+                                    )
+                                }
+                            }
+                            itemsIndexed(tracks) { index, song ->
+                                SongRow(
+                                    song = song,
+                                    index = index,
+                                    isActive = song.id == currentSong?.id,
+                                    isPlaying = song.id == currentSong?.id && isPlaying,
+                                    onClick = { playFrom(index) }
+                                )
+                                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                            }
+                            item { Spacer(Modifier.height(72.dp)) }
                         }
-                        item { Spacer(Modifier.height(72.dp)) }
                     }
                 }
+                MiniPlayerBar(
+                    player = player,
+                    onClick = { },
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                )
             }
-            MiniPlayerBar(
-                player = player,
-                onClick = { },
-                modifier = Modifier.align(Alignment.BottomCenter)
+        }
+    }
+}
+
+@Composable
+private fun PlaylistHeader(
+    coverUrl: String,
+    name: String,
+    creator: String,
+    trackCount: Int,
+    onPlayAll: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier.size(112.dp).clip(MaterialTheme.shapes.extraLarge)
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+        ) {
+            if (coverUrl.isNotBlank()) {
+                AsyncImage(
+                    model = coverUrl,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                name,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                listOf(creator.ifBlank { "精选歌单" }, "$trackCount 首").joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(10.dp))
+            FilledTonalButton(onClick = onPlayAll, enabled = trackCount > 0) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                Spacer(Modifier.width(6.dp))
+                Text("播放全部")
+            }
         }
     }
 }

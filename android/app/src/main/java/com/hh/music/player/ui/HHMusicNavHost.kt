@@ -7,6 +7,8 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -16,10 +18,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import android.net.Uri
 import com.hh.music.player.data.AppContainer
 import com.hh.music.player.data.local.LocalStore
 import com.hh.music.player.playback.PlayerController
@@ -33,7 +37,8 @@ import com.hh.music.player.ui.search.SearchScreen
 
 object Routes {
     const val DISCOVER = "discover"
-    const val SEARCH = "search"
+    const val SEARCH = "search?keyword={keyword}"
+    const val SEARCH_ARG = "keyword"
     const val TOPLIST = "toplist"
     const val LIBRARY = "library"
     const val SETTINGS = "settings"
@@ -41,6 +46,7 @@ object Routes {
     const val PLAYER = "player"
 
     fun playlist(id: Long) = "playlist/$id"
+    fun search(keyword: String = "") = "search?keyword=${Uri.encode(keyword)}"
 }
 
 /** Provides the app-wide player controller to composables. */
@@ -73,62 +79,59 @@ fun HHMusicNavHost(container: AppContainer) {
         LocalPlayerController provides container.playerController,
         LocalStoreProvider provides container.localStore
     ) {
-        Scaffold(
-            bottomBar = {
-                if (showBottomBar) {
-                    NavigationBar(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        tonalElevation = 0.dp
-                    ) {
-                        tabs.forEach { tab ->
-                            NavigationBarItem(
-                                selected = currentRoute == tab.route,
-                                onClick = {
-                                    navController.navigate(tab.route) {
-                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                },
-                                icon = tab.icon,
-                                label = { Text(tab.label) },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            )
+    NavigationSuiteScaffold(
+        navigationSuiteType = NavigationSuiteType.NavigationBar,
+        navigationSuiteColors = NavigationSuiteDefaults.colors(
+            navigationBarContainerColor = MaterialTheme.colorScheme.surfaceContainer
+        ),
+        navigationItems = {
+            tabs.forEach { tab ->
+                item(
+                    selected = currentRoute == tab.route,
+                    onClick = {
+                        navController.navigate(tab.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
                         }
-                    }
-                }
+                    },
+                    icon = tab.icon,
+                    label = { Text(tab.label) },
+                    alwaysShowLabel = true
+                )
             }
-        ) { innerPadding ->
-            NavHost(
-                navController = navController,
-                startDestination = Routes.DISCOVER,
-                modifier = Modifier.padding(innerPadding)
-            ) {
+        }
+    ) { innerPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = Routes.DISCOVER,
+            modifier = Modifier
+        ) {
                 composable(Routes.DISCOVER) {
                     DiscoverScreen(
                         repository = container.repository,
                         onOpenToplist = { navController.navigate(Routes.TOPLIST) },
-                        onOpenSearch = { navController.navigate(Routes.SEARCH) },
+                        onSearch = { kw -> navController.navigate(Routes.search(kw)) },
                         onOpenPlaylist = { id -> navController.navigate(Routes.playlist(id)) },
                         onOpenPlayer = { navController.navigate(Routes.PLAYER) }
                     )
                 }
-                composable(Routes.SEARCH) {
+                composable(
+                    route = Routes.SEARCH,
+                    arguments = listOf(navArgument(Routes.SEARCH_ARG) { defaultValue = "" })
+                ) { backStackEntry ->
+                    val keyword = backStackEntry.arguments?.getString(Routes.SEARCH_ARG).orEmpty()
                     SearchScreen(
                         repository = container.repository,
-                        onOpenPlayer = { navController.navigate(Routes.PLAYER) }
+                        onOpenPlayer = { navController.navigate(Routes.PLAYER) },
+                        initialQuery = keyword
                     )
                 }
                 composable(Routes.TOPLIST) {
                     ToplistScreen(
                         repository = container.repository,
-                        onPlaylistClick = { id -> navController.navigate(Routes.playlist(id)) }
+                        onPlaylistClick = { id -> navController.navigate(Routes.playlist(id)) },
+                        onBack = { navController.popBackStack() }
                     )
                 }
                 composable(Routes.LIBRARY) {

@@ -57,6 +57,8 @@ class LocalStore(private val context: Context) {
     val useBackend: Flow<Boolean> = context.dataStore.data.map { it[useBackendKey] ?: false }
     private val audioQualityKey = stringPreferencesKey("audio_quality")
     val audioQuality: Flow<String> = context.dataStore.data.map { it[audioQualityKey] ?: "exhigh" }
+    private val progressStyleKey = stringPreferencesKey("progress_style")
+    val progressStyle: Flow<String> = context.dataStore.data.map { it[progressStyleKey] ?: "slider" }
     val playMode: Flow<String> = context.dataStore.data.map { it[playModeKey] ?: "sequence" }
 
     suspend fun toggleFavorite(song: Song) {
@@ -105,6 +107,7 @@ class LocalStore(private val context: Context) {
 
     suspend fun setUseBackend(value: Boolean) { context.dataStore.edit { it[useBackendKey] = value } }
     suspend fun setAudioQuality(value: String) { context.dataStore.edit { it[audioQualityKey] = value } }
+    suspend fun setProgressStyle(value: String) { context.dataStore.edit { it[progressStyleKey] = value } }
     suspend fun setPlayMode(mode: String) {
         context.dataStore.edit { it[playModeKey] = mode }
     }

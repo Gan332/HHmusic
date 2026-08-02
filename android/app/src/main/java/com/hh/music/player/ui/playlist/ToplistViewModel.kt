@@ -19,7 +19,10 @@ class ToplistViewModel(private val repository: MusicRepository) : ViewModel() {
     private val _state = MutableStateFlow(ToplistState())
     val state: StateFlow<ToplistState> = _state.asStateFlow()
 
-    init {
+    init { refresh() }
+
+    fun refresh() {
+        _state.value = _state.value.copy(loading = true, error = null)
         viewModelScope.launch {
             repository.toplists()
                 .onSuccess { _state.value = ToplistState(loading = false, toplists = it) }

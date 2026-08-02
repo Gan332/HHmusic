@@ -22,6 +22,10 @@ class SettingsViewModel(private val store: LocalStore) : ViewModel() {
     val audioQuality: StateFlow<String> =
         store.audioQuality.stateIn(viewModelScope, SharingStarted.Eagerly, "exhigh")
 
+    val progressStyle: StateFlow<String> =
+        store.progressStyle.stateIn(viewModelScope, SharingStarted.Eagerly, "slider")
+
     fun setUseBackend(value: Boolean) { viewModelScope.launch { store.setUseBackend(value) } }
     fun setAudioQuality(value: String) { viewModelScope.launch { store.setAudioQuality(value) } }
+    fun setProgressStyle(value: String) { viewModelScope.launch { store.setProgressStyle(value) } }
 }

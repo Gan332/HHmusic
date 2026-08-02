@@ -14,7 +14,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.hh.music.player.data.MusicRepository
@@ -22,11 +21,14 @@ import com.hh.music.player.ui.LocalPlayerController
 import com.hh.music.player.ui.LocalStoreProvider
 import com.hh.music.player.ui.components.MiniPlayerBar
 import com.hh.music.player.ui.components.SongRow
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
     repository: MusicRepository,
     onOpenPlayer: () -> Unit,
+    initialQuery: String = "",
     vm: SearchViewModel? = null
 ) {
     val store = LocalStoreProvider.current
@@ -36,91 +38,153 @@ fun SearchScreen(
     val currentSong by player.currentSong.collectAsState()
     val isPlaying by player.isPlaying.collectAsState()
     val history by store.searchHistory.collectAsState(initial = emptyList())
+    val scope = rememberCoroutineScope()
+    val searchBarState = rememberSearchBarState()
 
     fun playFrom(index: Int) {
         val list = state.results
         if (list.isNotEmpty()) player.playQueue(list, index)
     }
 
-    Scaffold(
-        topBar = {
-            Column {
-                Text(
-                    "搜索",
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                TextField(
-                    value = state.query,
-                    onValueChange = actualVm::onQueryChange,
-                    placeholder = { Text("搜索歌曲、歌手") },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                    trailingIcon = {
-                        if (state.query.isNotEmpty()) {
-                            IconButton(onClick = { actualVm.onQueryChange("") }) {
-                                Icon(Icons.Filled.Close, contentDescription = "清空")
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .clip(CircleShape),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                        unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
-                    )
-                )
-            }
+    // 从首页热搜跳转过来时，自动展开并搜索关键词。
+    LaunchedEffect(initialQuery) {
+        if (initialQuery.isNotBlank()) {
+            actualVm.onQueryChange(initialQuery)
+            actualVm.submitSearch(initialQuery)
+            searchBarState.animateToExpanded()
         }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            when {
-                state.loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                state.error != null -> Text(
-                    "出错啦: ${state.error}",
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.align(Alignment.Center).padding(24.dp)
-                )
-                state.query.isBlank() -> {
-                    // Search history section
-                    SearchHistorySection(
-                        history = history,
-                        onPick = { kw -> actualVm.onQueryChange(kw); actualVm.submitSearch(kw) },
-                        onClear = { actualVm.clearHistory() }
-                    )
+    }
+
+    val inputField: @Composable () -> Unit = {
+        SearchBarDefaults.InputField(
+            query = state.query,
+            onQueryChange = actualVm::onQueryChange,
+            onSearch = actualVm::submitSearch,
+            expanded = searchBarState.currentValue == SearchBarValue.Expanded,
+            onExpandedChange = { expanded ->
+                scope.launch {
+                    if (expanded) searchBarState.animateToExpanded()
+                    else searchBarState.animateToCollapsed()
                 }
-                state.results.isEmpty() -> Text(
-                    "没有找到结果",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-                else -> {
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        itemsIndexed(state.results) { index, song ->
-                            SongRow(
-                                song = song,
-                                index = index,
-                                isActive = song.id == currentSong?.id,
-                                isPlaying = song.id == currentSong?.id && isPlaying,
-                                onClick = { playFrom(index) }
-                            )
-                            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                        }
-                        item { Spacer(Modifier.height(72.dp)) }
+            },
+            placeholder = { Text("搜索歌曲、歌手") },
+            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+            trailingIcon = {
+                if (state.query.isNotEmpty()) {
+                    IconButton(onClick = { actualVm.onQueryChange("") }) {
+                        Icon(Icons.Filled.Close, contentDescription = "清空")
                     }
                 }
             }
-            MiniPlayerBar(
-                player = player,
-                onClick = onOpenPlayer,
-                modifier = Modifier.align(Alignment.BottomCenter)
-            )
+        )
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                Column {
+                    Text(
+                        "搜索",
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    SearchBar(
+                        state = searchBarState,
+                        inputField = inputField,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+            }
+        ) { padding ->
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                when {
+                    state.loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    state.error != null -> Text(
+                        "出错啦: ${state.error}",
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.align(Alignment.Center).padding(24.dp)
+                    )
+                    state.query.isBlank() -> SearchHistorySection(
+                        history = history,
+                        onPick = { kw ->
+                            actualVm.onQueryChange(kw)
+                            actualVm.submitSearch(kw)
+                        },
+                        onClear = { actualVm.clearHistory() }
+                    )
+                    state.results.isEmpty() -> Text(
+                        "没有找到结果",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                    else -> {
+                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            itemsIndexed(state.results) { index, song ->
+                                SongRow(
+                                    song = song,
+                                    index = index,
+                                    isActive = song.id == currentSong?.id,
+                                    isPlaying = song.id == currentSong?.id && isPlaying,
+                                    onClick = { playFrom(index) }
+                                )
+                                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                            }
+                            item { Spacer(Modifier.height(72.dp)) }
+                        }
+                    }
+                }
+                MiniPlayerBar(
+                    player = player,
+                    onClick = onOpenPlayer,
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                )
+            }
+        }
+
+        // 全屏展开的 M3E 搜索结果面板
+        ExpandedFullScreenSearchBar(
+            state = searchBarState,
+            inputField = inputField,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            when {
+                state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+                state.query.isBlank() -> SearchHistorySection(
+                    history = history,
+                    onPick = { kw ->
+                        actualVm.onQueryChange(kw)
+                        actualVm.submitSearch(kw)
+                    },
+                    onClear = { actualVm.clearHistory() }
+                )
+                state.results.isEmpty() && state.error == null -> Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("没有找到结果", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                state.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("出错啦: ${state.error}", color = MaterialTheme.colorScheme.error)
+                }
+                else -> LazyColumn(Modifier.fillMaxSize()) {
+                    itemsIndexed(state.results) { index, song ->
+                        SongRow(
+                            song = song,
+                            index = index,
+                            isActive = song.id == currentSong?.id,
+                            isPlaying = song.id == currentSong?.id && isPlaying,
+                            onClick = { playFrom(index) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                    }
+                    item { Spacer(Modifier.height(24.dp)) }
+                }
+            }
         }
     }
 }
@@ -142,9 +206,19 @@ private fun SearchHistorySection(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Filled.History, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+            Icon(
+                Icons.Filled.History,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
             Spacer(Modifier.width(8.dp))
-            Text("搜索历史", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.weight(1f))
+            Text(
+                "搜索历史",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f)
+            )
             TextButton(onClick = onClear) { Text("清空") }
         }
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
@@ -154,12 +228,17 @@ private fun SearchHistorySection(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        color = MaterialTheme.colorScheme.secondaryContainer,
                         shape = CircleShape,
                         modifier = Modifier.size(32.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Filled.History, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(
+                                Icons.Filled.History,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
                         }
                     }
                     Spacer(Modifier.width(12.dp))
