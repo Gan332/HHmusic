@@ -70,8 +70,8 @@ class LyricParserTest {
     @Test
     fun `fractional seconds with one or two digits scale correctly`() {
         // ".5" = 500ms, ".05" = 50ms, ".1" = 100ms
-        assertEquals(500L, LyricParser.parse("[00:01.5]a")[0].timeMs)
-        assertEquals(50L, LyricParser.parse("[00:01.05]a")[0].timeMs)
-        assertEquals(100L, LyricParser.parse("[00:01.1]a")[0].timeMs)
+        assertEquals(500L, LyricParser.parse("[00:00.5]a")[0].timeMs)
+        assertEquals(50L, LyricParser.parse("[00:00.05]a")[0].timeMs)
+        assertEquals(100L, LyricParser.parse("[00:00.1]a")[0].timeMs)
     }
 }

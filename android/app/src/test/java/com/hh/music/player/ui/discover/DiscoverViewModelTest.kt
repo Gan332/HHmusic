@@ -95,8 +95,11 @@ class DiscoverViewModelTest {
     fun `a newer refresh supersedes the in-flight one`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val api = FlakyApi()
-        val vm = DiscoverViewModel(MusicRepository(api).apply { useBackend = true })
-        runCurrent() // init refresh in flight: batch 0 pending
+        val vm = DiscoverViewModel(
+            MusicRepository(api, ioDispatcher = StandardTestDispatcher(testScheduler)).apply { useBackend = true }
+        )
+        vm.refresh(force = true) // supersede the cached/no-op init before it runs
+        runCurrent()
         assertEquals(1, api.rec.size)
         assertTrue(vm.state.value.refreshing)
 
@@ -120,7 +123,9 @@ class DiscoverViewModelTest {
     fun `a successful refresh warms the cache for the next call`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val api = FlakyApi()
-        val vm = DiscoverViewModel(MusicRepository(api).apply { useBackend = true })
+        val vm = DiscoverViewModel(
+            MusicRepository(api, ioDispatcher = StandardTestDispatcher(testScheduler)).apply { useBackend = true }
+        )
         runCurrent()
         vm.refresh(force = true) // supersede whatever init did (cache or network)
         runCurrent()

@@ -60,7 +60,9 @@ class SearchViewModelTest {
     fun `rapid typing collapses into a single debounced request`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val api = FakeApi()
-        val vm = SearchViewModel(MusicRepository(api).apply { useBackend = true })
+        val vm = SearchViewModel(
+            MusicRepository(api, ioDispatcher = StandardTestDispatcher(testScheduler)).apply { useBackend = true }
+        )
         api.handler = { kw, _, _ -> SearchResponse(songCount = 1, songs = listOf(song(kw))) }
 
         vm.onQueryChange("a")
@@ -79,7 +81,9 @@ class SearchViewModelTest {
     fun `a stale slow response never overwrites the newest results`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val api = FakeApi()
-        val vm = SearchViewModel(MusicRepository(api).apply { useBackend = true })
+        val vm = SearchViewModel(
+            MusicRepository(api, ioDispatcher = StandardTestDispatcher(testScheduler)).apply { useBackend = true }
+        )
         val slow = CompletableDeferred<SearchResponse>()
         api.handler = { kw, _, _ ->
             if (kw == "a") slow.await() else SearchResponse(songCount = 1, songs = listOf(song(kw)))
@@ -103,7 +107,9 @@ class SearchViewModelTest {
     fun `loadMore appends pages and dedupes overlapping ids`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val api = FakeApi()
-        val vm = SearchViewModel(MusicRepository(api).apply { useBackend = true })
+        val vm = SearchViewModel(
+            MusicRepository(api, ioDispatcher = StandardTestDispatcher(testScheduler)).apply { useBackend = true }
+        )
         api.handler = { kw, limit, offset ->
             val first = offset
             val count = minOf(limit, 45 - offset)

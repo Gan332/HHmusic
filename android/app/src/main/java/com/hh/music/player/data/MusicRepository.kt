@@ -12,6 +12,7 @@ import com.hh.music.player.network.ToplistResponse
 import kotlinx.coroutines.launch
 import com.hh.music.player.playback.PlayerController
 import com.hh.music.player.playback.EqualizerController
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.withContext
@@ -28,7 +29,8 @@ import org.json.JSONObject
  */
 class MusicRepository(
     private val api: HHMusicApi = NetworkModule.api,
-    private val local: LocalStore? = null
+    private val local: LocalStore? = null,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
 
     /** Runtime flags, kept in sync with [LocalStore] by [AppContainer]. */
@@ -50,7 +52,7 @@ class MusicRepository(
         runCatching {
             val key = SearchCacheKey(keyword, limit, offset)
             searchCache[key]?.let { return@runCatching it }
-            val page = withContext(Dispatchers.IO) {
+            val page = withContext(ioDispatcher) {
                 if (useBackend) {
                     val resp = api.search(keyword, limit, offset)
                     SearchPage(songs = resp.songs, total = resp.songCount)
@@ -71,7 +73,7 @@ class MusicRepository(
 
     suspend fun searchArtists(keyword: String, limit: Int = 20, offset: Int = 0): Result<ArtistSearchPage> =
         runCatching {
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 if (useBackend) {
                     val resp = api.searchArtists(keyword, limit, offset)
                     ArtistSearchPage(artists = resp.artists, total = resp.total)
@@ -89,7 +91,7 @@ class MusicRepository(
         }
 
     suspend fun songDetail(ids: List<Long>): Result<List<Song>> = runCatching {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             if (useBackend) {
                 api.songDetail(ids.joinToString(",")).songs
             } else {
@@ -106,7 +108,7 @@ class MusicRepository(
      * public "outer url" — exactly Ncrust's strategy.
      */
     suspend fun songUrl(id: Long): Result<SongUrl> = runCatching {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             if (useBackend) {
                 api.songUrl(id)
             } else {
@@ -133,7 +135,7 @@ class MusicRepository(
 
     suspend fun lyric(id: Long): Result<Lyric> = runCatching {
         lyricCache[id]?.let { return@runCatching it }
-        val lrc = withContext(Dispatchers.IO) {
+        val lrc = withContext(ioDispatcher) {
             if (useBackend) {
                 api.lyric(id)
             } else {
@@ -157,7 +159,7 @@ class MusicRepository(
     }
 
     suspend fun playlistDetail(id: Long): Result<Playlist> = runCatching {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             if (useBackend) {
                 api.playlistDetail(id)
             } else {
@@ -175,7 +177,7 @@ class MusicRepository(
     }
 
     suspend fun toplists(): Result<List<ToplistItem>> = runCatching {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             if (useBackend) {
                 api.toplist().list
             } else {
@@ -186,7 +188,7 @@ class MusicRepository(
     }
 
     suspend fun recommendSongs(limit: Int = 30): Result<List<Song>> = runCatching {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             if (useBackend) {
                 api.recommendSongs(limit).songs
             } else {
@@ -203,7 +205,7 @@ class MusicRepository(
     }
 
     suspend fun recommendPlaylists(limit: Int = 12): Result<List<RecommendPlaylistItem>> = runCatching {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             if (useBackend) {
                 api.recommendPlaylists(limit).list
             } else {
@@ -228,7 +230,7 @@ class MusicRepository(
 
     suspend fun artistSongsPage(id: Long, limit: Int = 50, offset: Int = 0, order: String = "hot"): Result<ArtistSongsPage> =
         runCatching {
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 if (useBackend) {
                     val resp = api.artistSongs(id, limit, offset, order)
                     ArtistSongsPage(songs = resp.songs, total = resp.total)
@@ -250,7 +252,7 @@ class MusicRepository(
         artistSongsPage(id, limit, offset, order).map { it.songs }
 
     suspend fun newSongs(limit: Int = 30): Result<List<Song>> = runCatching {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             if (useBackend) {
                 api.newSongs(limit).songs
             } else {

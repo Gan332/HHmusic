@@ -97,7 +97,7 @@ class PlaybackEngineTest {
     fun `removing the current track picks the next item`() {
         assertEquals(2, PlaybackEngine.indexAfterRemove(currentIndex = 2, removedIndex = 2, newSize = 4))
         // Last item removed while it plays -> clamp to the new tail.
-        assertEquals(3, PlaybackEngine.indexAfterRemove(currentIndex = 3, removedIndex = 3, newSize = 3))
+        assertEquals(2, PlaybackEngine.indexAfterRemove(currentIndex = 3, removedIndex = 3, newSize = 3))
         // Emptying the queue -> -1.
         assertEquals(-1, PlaybackEngine.indexAfterRemove(currentIndex = 0, removedIndex = 0, newSize = 0))
     }
@@ -109,7 +109,7 @@ class PlaybackEngineTest {
 
     @Test
     fun `moving updates the current index consistently`() {
-        assertEquals(4, PlaybackEngine.indexAfterMove(currentIndex = 4, from = 4, to = 1))
+        assertEquals(1, PlaybackEngine.indexAfterMove(currentIndex = 4, from = 4, to = 1))
         assertEquals(1, PlaybackEngine.indexAfterMove(currentIndex = 0, from = 2, to = 0))
         assertEquals(2, PlaybackEngine.indexAfterMove(currentIndex = 3, from = 1, to = 3))
         assertEquals(3, PlaybackEngine.indexAfterMove(currentIndex = 3, from = 1, to = 2))
@@ -152,7 +152,7 @@ class PlaybackEngineTest {
         assertEquals(0, PlaybackEngine.indexAfterMove(currentIndex = 0, from = 0, to = 0))
 
         assertEquals(4, PlaybackEngine.indexAfterMove(currentIndex = 0, from = 0, to = 4))
-        assertEquals(3, PlaybackEngine.indexAfterMove(currentIndex = 3, from = 1, to = 4))
+        assertEquals(2, PlaybackEngine.indexAfterMove(currentIndex = 3, from = 1, to = 4))
         assertEquals(5, PlaybackEngine.indexAfterMove(currentIndex = 5, from = 5, to = 5))
     }
 }
