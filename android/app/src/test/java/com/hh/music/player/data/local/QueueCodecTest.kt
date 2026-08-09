@@ -29,7 +29,7 @@ class QueueCodecTest {
 
     @Test
     fun `round trip preserves songs index and position`() {
-        val songs = (0L..4L).map(::song)
+        val songs = (0L..4L).map { id -> song(id) }
         val raw = QueueCodec.encode(songs, index = 3, positionMs = 123_456L)
         val back = QueueCodec.decode(raw)
         assertEquals(5, back!!.songs.size)
@@ -54,7 +54,7 @@ class QueueCodecTest {
 
     @Test
     fun `huge queues are capped to MAX_QUEUED`() {
-        val many = (0 until QueueCodec.MAX_QUEUED * 2).map(::song)
+        val many = (0 until QueueCodec.MAX_QUEUED * 2).map { id -> song(id) }
         val raw = QueueCodec.encode(many, index = QueueCodec.MAX_QUEUED * 2 - 1)
         val back = QueueCodec.decode(raw)!!
         assertEquals(QueueCodec.MAX_QUEUED, back.songs.size)

@@ -7,6 +7,7 @@ import com.hh.music.player.network.LikeBody
 import com.hh.music.player.network.LikeResponse
 import com.hh.music.player.network.RecommendPlaylistResponse
 import com.hh.music.player.network.ToplistResponse
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -43,7 +44,7 @@ class MusicRepositoryUrlTest {
             api = FakeApi { SongUrl(id = it, url = null) },
             local = null
         ).apply { useBackend = true }
-        val result = repo.songUrl(42L)
+        val result = runBlocking { repo.songUrl(42L) }
         assertTrue(result.isSuccess)
         val url = result.getOrThrow()
         assertEquals(42L, url.id)
@@ -56,7 +57,7 @@ class MusicRepositoryUrlTest {
             api = FakeApi { SongUrl(id = it, url = "https://example/42.flac", br = 320_000) },
             local = null
         ).apply { useBackend = true }
-        val url = repo.songUrl(42L).getOrThrow()
+        val url = runBlocking { repo.songUrl(42L).getOrThrow() }
         assertTrue(url.isPlayable)
         assertEquals("https://example/42.flac", url.url)
     }

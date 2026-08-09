@@ -64,7 +64,7 @@ class PlaybackEngineTest {
     fun `shuffle skips resolved tracks until all are cached`() {
         val rng = Random(3)
         val resolved = setOf(1, 3, 4)
-        for (_) in 1..100 { // never picks a resolved index
+        for (attempt in 1..100) { // never picks a resolved index
             val idx = PlaybackEngine.nextPrefetchIndex(
                 queueSize = 5,
                 currentIndex = 0,

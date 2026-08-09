@@ -9,7 +9,7 @@ import com.hh.music.player.network.HHMusicApi
 import com.hh.music.player.network.LikeBody
 import com.hh.music.player.network.LikeResponse
 import com.hh.music.player.network.RecommendPlaylistResponse
-import com.hh.music.player.network.SongUrl
+import com.hh.music.player.data.SongUrl
 import com.hh.music.player.network.ToplistResponse
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -61,7 +61,7 @@ class SearchViewModelTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val api = FakeApi()
         val vm = SearchViewModel(MusicRepository(api).apply { useBackend = true })
-        api.search = { kw, _, _ -> SearchResponse(songCount = 1, songs = listOf(song(kw))) }
+        api.handler = { kw, _, _ -> SearchResponse(songCount = 1, songs = listOf(song(kw))) }
 
         vm.onQueryChange("a")
         advanceTimeBy(100) // below the 350ms debounce
@@ -81,7 +81,7 @@ class SearchViewModelTest {
         val api = FakeApi()
         val vm = SearchViewModel(MusicRepository(api).apply { useBackend = true })
         val slow = CompletableDeferred<SearchResponse>()
-        api.search = { kw, _, _ ->
+        api.handler = { kw, _, _ ->
             if (kw == "a") slow.await() else SearchResponse(songCount = 1, songs = listOf(song(kw)))
         }
 
@@ -104,7 +104,7 @@ class SearchViewModelTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val api = FakeApi()
         val vm = SearchViewModel(MusicRepository(api).apply { useBackend = true })
-        api.search = { kw, limit, offset ->
+        api.handler = { kw, limit, offset ->
             val first = offset
             val count = minOf(limit, 45 - offset)
             val ids = (first until first + count).toList()
