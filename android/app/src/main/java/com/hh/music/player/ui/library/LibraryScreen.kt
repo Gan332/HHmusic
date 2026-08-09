@@ -190,7 +190,7 @@ fun LibraryScreen(
                         currentSongId = currentSong?.id,
                         isPlaying = isPlaying,
                         onPlay = { index -> player.playQueue(favorites, index) },
-                        onLongPress = { id ->
+                        onLong = { id ->
                             managing = true
                             selectedIds = setOf(id)
                         }

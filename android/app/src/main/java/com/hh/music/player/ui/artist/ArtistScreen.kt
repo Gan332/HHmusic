@@ -70,7 +70,7 @@ fun ArtistScreen(
                 state.loading && state.songs.isEmpty() ->
                     CircularProgressIndicator(Modifier.align(Alignment.Center))
                 state.error != null && state.songs.isEmpty() ->
-                    ErrorState(message = state.error, onRetry = vm::retry, modifier = Modifier.align(Alignment.Center))
+                    ErrorState(message = state.error.orEmpty(), onRetry = vm::retry, modifier = Modifier.align(Alignment.Center))
                 else -> LazyColumn(Modifier.fillMaxSize()) {
                     item {
                         ArtistHeader(
@@ -141,7 +141,7 @@ fun ArtistScreen(
                         if (state.error != null) {
                             item {
                                 Text(
-                                    state.error,
+                                    state.error.orEmpty(),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.error,
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,

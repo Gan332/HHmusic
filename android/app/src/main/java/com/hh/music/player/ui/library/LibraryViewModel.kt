@@ -33,6 +33,6 @@ class LibraryViewModel(private val store: LocalStore) : ViewModel() {
     }
 
     fun removeSavedPlaylist(id: Long) {
-        viewModelScope.launch { store.toggleSavedPlaylist(SavedPlaylist(id = id)) }
+        viewModelScope.launch { store.toggleSavedPlaylist(SavedPlaylist(id = id, name = "")) }
     }
 }

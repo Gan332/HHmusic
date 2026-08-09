@@ -100,7 +100,7 @@ fun DiscoverScreen(
                 state.allEmpty && state.recommend.loading -> LoadingState()
                 state.allEmpty && state.allFailed -> ErrorState("推荐加载失败，请检查网络", { vm.refresh(force = true) })
                 else -> LazyColumn(Modifier.fillMaxSize()) {
-                    item { QuickEntries(state, onOpenToplist, player::playQueue) }
+                    item { QuickEntries(state, onOpenToplist, { songs -> player.playQueue(songs, 0) }) }
                     item {
                         Spacer(Modifier.height(10.dp))
                         SectionTitle(
@@ -163,7 +163,7 @@ fun DiscoverScreen(
                     Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                     if (moreData.isNotEmpty() && moreSection != MoreSection.PLAYLISTS) {
                         TextButton(onClick = {
-                            player.playQueue(moreData, 0)
+                            player.playQueue(moreData as List<Song>, 0)
                             moreSection = null
                         }) {
                             Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -191,7 +191,7 @@ fun DiscoverScreen(
                                 isActive = s.id == currentSong?.id,
                                 isPlaying = s.id == currentSong?.id && isPlaying,
                                 onClick = {
-                                    player.playQueue(moreData, index)
+                                    player.playQueue(moreData as List<Song>, index)
                                     moreSection = null
                                 }
                             )
@@ -234,7 +234,7 @@ private fun <T> SectionContent(
 private fun QuickEntries(
     state: DiscoverState,
     onOpenToplist: () -> Unit,
-    onPlay: (Int) -> Unit
+    onPlay: (List<Song>) -> Unit
 ) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
@@ -244,13 +244,13 @@ private fun QuickEntries(
         QuickEntry(
             "每日推荐",
             Icons.Filled.AutoAwesome,
-            { if (state.recommend.data.isNotEmpty()) onPlay(0) },
+            { if (state.recommend.data.isNotEmpty()) onPlay(state.recommend.data) },
             Modifier.weight(1f)
         )
         QuickEntry(
             "新歌速递",
             Icons.Filled.Whatshot,
-            { if (state.newSongs.data.isNotEmpty()) onPlay(0) },
+            { if (state.newSongs.data.isNotEmpty()) onPlay(state.newSongs.data) },
             Modifier.weight(1f)
         )
     }
