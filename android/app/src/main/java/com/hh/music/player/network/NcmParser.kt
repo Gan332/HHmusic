@@ -2,6 +2,8 @@ package com.hh.music.player.network
 
 import com.hh.music.player.data.Album
 import com.hh.music.player.data.Artist
+import com.hh.music.player.data.ArtistSearchPage
+import com.hh.music.player.data.ArtistSongsPage
 import com.hh.music.player.data.SearchPage
 import com.hh.music.player.data.Song
 import com.hh.music.player.data.ToplistItem
@@ -44,6 +46,31 @@ object NcmParser {
         return out
     }
 
+    /** Parse cloud-search `type=100` artist results. */
+    fun artists(root: JSONObject, key: String = "artists"): List<Artist> {
+        val arr = root.optJSONArray(key) ?: return emptyList()
+        val out = ArrayList<Artist>(arr.length())
+        for (i in 0 until arr.length()) {
+            val a = arr.optJSONObject(i) ?: continue
+            out += Artist(
+                id = a.optLong("id", 0),
+                name = a.optString("name", ""),
+                picUrl = a.optString("img1v1Url", null)
+                    ?.takeIf { it.isNotBlank() && it != "null" }
+                    ?: a.optString("picUrl", null)?.takeIf { it.isNotBlank() && it != "null" }
+            )
+        }
+        return out
+    }
+
+    fun artistSearchPage(root: JSONObject): ArtistSearchPage {
+        val result = root.optJSONObject("result") ?: root
+        return ArtistSearchPage(
+            artists = artists(result),
+            total = result.optInt("artistCount", result.optInt("total", 0))
+        )
+    }
+
 /** Search stores results under result.songs (with result.songCount = total). */
     fun searchPage(root: JSONObject): SearchPage {
         val result = root.optJSONObject("result") ?: root
@@ -52,6 +79,12 @@ object NcmParser {
             total = result.optInt("songCount", result.optInt("total", 0))
         )
     }
+
+    fun artistSongsPage(root: JSONObject): ArtistSongsPage =
+        ArtistSongsPage(
+            songs = songList(root, "songs"),
+            total = root.optInt("total", root.optInt("songCount", 0))
+        )
 
     fun toplistItems(root: JSONObject): List<ToplistItem> {
         val arr = root.optJSONArray("list") ?: return emptyList()

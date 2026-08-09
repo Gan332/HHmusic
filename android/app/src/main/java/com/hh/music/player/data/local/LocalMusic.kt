@@ -11,6 +11,7 @@ import androidx.core.content.ContextCompat
 import com.hh.music.player.data.Album
 import com.hh.music.player.data.Artist
 import com.hh.music.player.data.Song
+import java.util.Locale
 
 /**
  * 本地音乐支持：扫描设备 MediaStore 中的音频 + 读取 SAF 导入文件的元数据。
@@ -47,6 +48,20 @@ object LocalMusic {
             if (seen.add(key)) out += s
         }
         return out
+    }
+
+    /**
+     * Quick filter by title, artist text or album name. Blank queries return the
+     * original list untouched. Pure function — JVM-testable.
+     */
+    fun filterByQuery(songs: List<Song>, query: String): List<Song> {
+        val q = query.trim().lowercase(Locale.ROOT)
+        if (q.isBlank()) return songs
+        return songs.filter { song ->
+            song.name.lowercase(Locale.ROOT).contains(q) ||
+                song.artistText.lowercase(Locale.ROOT).contains(q) ||
+                song.album.name.lowercase(Locale.ROOT).contains(q)
+        }
     }
 
     /** Android 13+ 使用细粒度音频权限，更早版本使用存储权限。 */

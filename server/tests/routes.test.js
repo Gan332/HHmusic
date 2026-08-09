@@ -43,6 +43,16 @@ function makeApp(overrides = {}) {
           ],
         },
       }),
+    searchArtists: async () =>
+      ok({
+        result: {
+          artistCount: 2,
+          artists: [
+            { id: 12, name: "周杰伦", img1v1Url: "https://p.music.163.com/a.jpg" },
+            { id: 13, name: "林俊杰", picUrl: "https://p.music.163.com/b.jpg" },
+          ],
+        },
+      }),
     getSongDetail: async () => ok({ songs: [{ id: 1, name: "晴天" }] }),
     getSongUrl: async (id) => ok({ data: [{ id, url: null, br: 0 }] }),
     getLyric: async () => ok({ lrc: { lyric: "[00:01.00]hi" } }),
@@ -128,6 +138,45 @@ describe("search", () => {
         duration: 269000,
         fee: 0,
       });
+    });
+  });
+});
+
+describe("artist routes", () => {
+  test("artist search normalizes artists and passes total through", async () => {
+    await withServer(makeApp(), async (base) => {
+      const { status, body } = await getJson(base, "/api/artist/search?s=周杰伦&limit=10");
+      assert.equal(status, 200);
+      assert.equal(body.total, 2);
+      assert.deepEqual(body.artists, [
+        { id: 12, name: "周杰伦", picUrl: "https://p.music.163.com/a.jpg" },
+        { id: 13, name: "林俊杰", picUrl: "https://p.music.163.com/b.jpg" },
+      ]);
+    });
+  });
+
+  test("artist search missing keyword -> 400", async () => {
+    await withServer(makeApp(), async (base) => {
+      const { status, body } = await getJson(base, "/api/artist/search");
+      assert.equal(status, 400);
+      assert.equal(body.code, 400);
+    });
+  });
+
+  test("artist songs passes total and normalized songs", async () => {
+    await withServer(makeApp(), async (base) => {
+      const { status, body } = await getJson(base, "/api/artist/songs?id=6&limit=5&order=hot");
+      assert.equal(status, 200);
+      assert.equal(body.total, 9);
+      assert.deepEqual(body.songs, [{ id: 6, name: "a", artists: [], album: {}, duration: 0, fee: 0 }]);
+    });
+  });
+
+  test("artist songs missing id -> 400", async () => {
+    await withServer(makeApp(), async (base) => {
+      const { status, body } = await getJson(base, "/api/artist/songs");
+      assert.equal(status, 400);
+      assert.equal(body.code, 400);
     });
   });
 });

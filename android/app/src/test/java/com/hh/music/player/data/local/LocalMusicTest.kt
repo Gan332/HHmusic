@@ -62,4 +62,40 @@ class LocalMusicTest {
     fun `imported entry without a uri is dropped silently`() {
         assertTrue(LocalMusic.merge(emptyList(), listOf(song(9L, null))).isEmpty())
     }
+
+    @Test
+    fun `blank filter returns the original list`() {
+        val songs = listOf(song(1L, "content://a"), song(2L, "content://b"))
+        assertEquals(songs, LocalMusic.filterByQuery(songs, "  "))
+    }
+
+    @Test
+    fun `filter matches title artist and album case-insensitively`() {
+        val one = Song(
+            id = 1L,
+            name = "晴天",
+            artists = listOf(Artist(name = "周杰伦")),
+            album = Album(name = "叶惠美"),
+            localUri = "content://a"
+        )
+        val two = Song(
+            id = 2L,
+            name = "江南",
+            artists = listOf(Artist(name = "林俊杰")),
+            album = Album(name = "第二天堂"),
+            localUri = "content://b"
+        )
+        val three = Song(
+            id = 3L,
+            name = "Spring",
+            artists = listOf(Artist(name = "Vivaldi")),
+            album = Album(name = "Four Seasons"),
+            localUri = "content://c"
+        )
+        val songs = listOf(one, two, three)
+        assertEquals(listOf(one), LocalMusic.filterByQuery(songs, "周杰伦"))
+        assertEquals(listOf(two), LocalMusic.filterByQuery(songs, "第二天堂"))
+        assertEquals(listOf(three), LocalMusic.filterByQuery(songs, "spring"))
+        assertTrue(LocalMusic.filterByQuery(songs, "不存在的关键词").isEmpty())
+    }
 }

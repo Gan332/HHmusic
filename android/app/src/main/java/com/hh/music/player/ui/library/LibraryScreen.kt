@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -326,8 +327,9 @@ private fun DownloadsPane(
     val statuses by downloadManager.statuses.collectAsState(initial = emptyMap())
     val capMb by store.cacheCapMb.collectAsState(initial = OfflineCache.DEFAULT_CAP_MB.toInt())
     val okEntries = entries.filter { !it.isFailed }
-    val failed = entries.filter { it.isFailed }
     val downloading = statuses.filterValues { it.state == DownloadState.DOWNLOADING }
+    val downloadingIds = downloading.keys
+    val failed = entries.filter { it.isFailed && it.id !in downloadingIds }
     val totalUsage = downloadManager.totalBytes()
 
     Column(Modifier.fillMaxSize()) {
@@ -342,6 +344,13 @@ private fun DownloadsPane(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+            if (failed.isNotEmpty()) {
+                TextButton(
+                    onClick = { downloadManager.clearFailed() }
+                ) {
+                    Text("清空失败")
+                }
             }
             TextButton(
                 enabled = entries.isNotEmpty() || downloading.isNotEmpty(),
@@ -367,7 +376,7 @@ private fun DownloadsPane(
         LazyColumn(Modifier.fillMaxSize()) {
             // 下载中的歌曲
             downloading.forEach { (songId, st) ->
-                val song = entries.firstOrNull { it.id == songId }?.song
+                val song = st.song ?: entries.firstOrNull { it.id == songId }?.song
                 if (song == null) return@forEach
                 item(key = "downloading_$songId") {
                     Row(
@@ -555,7 +564,11 @@ private fun LocalMusicPane(
     var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var scanning by remember { mutableStateOf(false) }
     var scanTrigger by remember { mutableStateOf(0) }
+    var filterQuery by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+    val filteredSongs = remember(songs, filterQuery) {
+        LocalMusic.filterByQuery(songs, filterQuery)
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -625,6 +638,25 @@ private fun LocalMusicPane(
                 Text("导入")
             }
         }
+        if (songs.isNotEmpty()) {
+            OutlinedTextField(
+                value = filterQuery,
+                onValueChange = { filterQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                placeholder = { Text("筛选标题或歌手") },
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (filterQuery.isNotEmpty()) {
+                        IconButton(onClick = { filterQuery = "" }) {
+                            Icon(Icons.Filled.Close, contentDescription = "清空筛选")
+                        }
+                    }
+                },
+                singleLine = true
+            )
+        }
         when {
             scanning && songs.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -647,19 +679,30 @@ private fun LocalMusicPane(
                 hint = "没有找到本地音乐，点右上角「导入」选择音频",
                 icon = Icons.Filled.LibraryMusic
             )
-            else -> LazyColumn(Modifier.fillMaxSize()) {
-                itemsIndexed(songs) { index, song ->
-                    SongRow(
-                        song = song,
-                        index = index,
-                        isActive = song.id == currentSongId,
-                        isPlaying = song.id == currentSongId && isPlaying,
-                        onClick = { if (songs.isNotEmpty()) player.playQueue(songs, index) },
-                        onLongClick = { onLongPress(song) }
+            else -> if (filteredSongs.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    EmptyState(
+                        hint = "没有匹配的本地音乐",
+                        icon = Icons.Filled.Search
                     )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
                 }
-                item { Spacer(Modifier.height(72.dp)) }
+            } else {
+                LazyColumn(Modifier.fillMaxSize()) {
+                    itemsIndexed(filteredSongs) { index, song ->
+                        SongRow(
+                            song = song,
+                            index = index,
+                            isActive = song.id == currentSongId,
+                            isPlaying = song.id == currentSongId && isPlaying,
+                            onClick = {
+                                if (filteredSongs.isNotEmpty()) player.playQueue(filteredSongs, index)
+                            },
+                            onLongClick = { onLongPress(song) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                    }
+                    item { Spacer(Modifier.height(72.dp)) }
+                }
             }
         }
     }

@@ -39,4 +39,8 @@ object LyricParser {
     /** Translation lines keyed by time, merged from `tlyric`. */
     fun translations(raw: String?): Map<Long, String> =
         parse(raw).associate { it.timeMs to it.text }
+
+    /** Romanization lines keyed by time, merged from `romalrc`. */
+    fun romanizations(raw: String?): Map<Long, String> =
+        parse(raw).associate { it.timeMs to it.text }
 }

@@ -1,6 +1,7 @@
 package com.hh.music.player.data
 
 import com.hh.music.player.network.ArtistSongsResponse
+import com.hh.music.player.network.ArtistSearchResponse
 import com.hh.music.player.network.HHMusicApi
 import com.hh.music.player.network.LikeBody
 import com.hh.music.player.network.LikeResponse
@@ -30,6 +31,8 @@ class MusicRepositoryUrlTest {
         override suspend fun recommendSongs(limit: Int): SongDetailResponse = throw UnsupportedOperationException()
         override suspend fun recommendPlaylists(limit: Int): RecommendPlaylistResponse = throw UnsupportedOperationException()
         override suspend fun artistSongs(id: Long, limit: Int, offset: Int, order: String): ArtistSongsResponse =
+            throw UnsupportedOperationException()
+        override suspend fun searchArtists(keyword: String, limit: Int, offset: Int): ArtistSearchResponse =
             throw UnsupportedOperationException()
         override suspend fun newSongs(limit: Int): SongDetailResponse = throw UnsupportedOperationException()
     }

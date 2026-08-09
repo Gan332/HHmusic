@@ -76,6 +76,19 @@ class LocalStore(private val context: Context) {
     private val progressStyleKey = stringPreferencesKey("progress_style")
     val progressStyle: Flow<String> = context.dataStore.data.map { it[progressStyleKey] ?: "slider" }
     val playMode: Flow<String> = context.dataStore.data.map { it[playModeKey] ?: "sequence" }
+    // ---- v1.6: theme + lyric display preferences ----
+    private val themeModeKey = stringPreferencesKey("theme_mode")
+    val themeMode: Flow<String> = context.dataStore.data.map { it[themeModeKey] ?: "system" }
+    private val themeColorKey = stringPreferencesKey("theme_color")
+    val themeColor: Flow<String> = context.dataStore.data.map { it[themeColorKey] ?: "green" }
+    private val dynamicColorKey = booleanPreferencesKey("dynamic_color")
+    val dynamicColor: Flow<Boolean> = context.dataStore.data.map { it[dynamicColorKey] ?: true }
+    private val showLyricTranslationKey = booleanPreferencesKey("show_lyric_translation")
+    val showLyricTranslation: Flow<Boolean> = context.dataStore.data.map { it[showLyricTranslationKey] ?: true }
+    private val showLyricRomanizationKey = booleanPreferencesKey("show_lyric_romanization")
+    val showLyricRomanization: Flow<Boolean> = context.dataStore.data.map { it[showLyricRomanizationKey] ?: false }
+    private val lyricFontScaleKey = stringPreferencesKey("lyric_font_scale")
+    val lyricFontScale: Flow<String> = context.dataStore.data.map { it[lyricFontScaleKey] ?: "medium" }
     // ---- v1.5: playback speed, equalizer, offline cache ----
     private val speedKey = floatPreferencesKey("speed")
     val speed: Flow<Float> = context.dataStore.data.map { (it[speedKey] ?: 1f).coerceIn(0.5f, 2f) }
@@ -181,6 +194,12 @@ suspend fun clearSearchHistory() {
     suspend fun setUseBackend(value: Boolean) { context.dataStore.edit { it[useBackendKey] = value } }
     suspend fun setAudioQuality(value: String) { context.dataStore.edit { it[audioQualityKey] = value } }
     suspend fun setProgressStyle(value: String) { context.dataStore.edit { it[progressStyleKey] = value } }
+    suspend fun setThemeMode(value: String) { context.dataStore.edit { it[themeModeKey] = value } }
+    suspend fun setThemeColor(value: String) { context.dataStore.edit { it[themeColorKey] = value } }
+    suspend fun setDynamicColor(value: Boolean) { context.dataStore.edit { it[dynamicColorKey] = value } }
+    suspend fun setShowLyricTranslation(value: Boolean) { context.dataStore.edit { it[showLyricTranslationKey] = value } }
+    suspend fun setShowLyricRomanization(value: Boolean) { context.dataStore.edit { it[showLyricRomanizationKey] = value } }
+    suspend fun setLyricFontScale(value: String) { context.dataStore.edit { it[lyricFontScaleKey] = value } }
     suspend fun setSpeed(value: Float) { context.dataStore.edit { it[speedKey] = value } }
     suspend fun setEqualizerEnabled(value: Boolean) { context.dataStore.edit { it[equalizerEnabledKey] = value } }
     suspend fun setEqualizerPreset(value: String) { context.dataStore.edit { it[equalizerPresetKey] = value } }

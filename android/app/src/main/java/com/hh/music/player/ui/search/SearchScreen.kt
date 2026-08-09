@@ -1,5 +1,6 @@
 package com.hh.music.player.ui.search
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -9,19 +10,25 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.hh.music.player.data.Artist
 import com.hh.music.player.data.MusicRepository
 import com.hh.music.player.ui.LocalPlayerController
 import com.hh.music.player.ui.LocalStoreProvider
+import com.hh.music.player.ui.components.ArtworkImage
 import com.hh.music.player.ui.components.EmptyState
 import com.hh.music.player.ui.components.LoadingState
 import com.hh.music.player.ui.components.MiniPlayerBar
@@ -36,6 +43,7 @@ fun SearchScreen(
     repository: MusicRepository,
     onOpenPlayer: () -> Unit,
     initialQuery: String = "",
+    onOpenArtist: (Artist) -> Unit = {},
     vm: SearchViewModel? = null
 ) {
     val store = LocalStoreProvider.current
@@ -121,7 +129,7 @@ fun SearchScreen(
                         },
                         onClear = { actualVm.clearHistory() }
                     )
-                    state.results.isEmpty() -> EmptyState(
+                    state.results.isEmpty() && state.artists.isEmpty() -> EmptyState(
                         hint = "没有找到结果",
                         icon = Icons.Filled.Search
                     )
@@ -130,7 +138,9 @@ fun SearchScreen(
                         currentSongId = currentSong?.id,
                         isPlaying = isPlaying,
                         onPlay = ::playFrom,
-                        onLoadMore = actualVm::loadMore
+                        onLoadMore = actualVm::loadMore,
+                        artists = state.artists,
+                        onOpenArtist = onOpenArtist
                     )
                 }
                 MiniPlayerBar(
@@ -158,7 +168,7 @@ fun SearchScreen(
                     },
                     onClear = { actualVm.clearHistory() }
                 )
-                state.results.isEmpty() && state.error == null -> EmptyState(
+                state.results.isEmpty() && state.artists.isEmpty() && state.error == null -> EmptyState(
                     hint = "没有找到结果",
                     icon = Icons.Filled.Search
                 )
@@ -171,7 +181,9 @@ fun SearchScreen(
                     currentSongId = currentSong?.id,
                     isPlaying = isPlaying,
                     onPlay = ::playFrom,
-                    onLoadMore = actualVm::loadMore
+                    onLoadMore = actualVm::loadMore,
+                    artists = state.artists,
+                    onOpenArtist = onOpenArtist
                 )
             }
         }
@@ -185,7 +197,9 @@ private fun SearchResultsList(
     currentSongId: Long?,
     isPlaying: Boolean,
     onPlay: (Int) -> Unit,
-    onLoadMore: () -> Unit
+    onLoadMore: () -> Unit,
+    artists: List<Artist> = emptyList(),
+    onOpenArtist: (Artist) -> Unit = {}
 ) {
     val listState = rememberLazyListState()
     val shouldLoadMore by remember {
@@ -201,6 +215,11 @@ private fun SearchResultsList(
         state = listState,
         modifier = Modifier.fillMaxSize()
     ) {
+        if (artists.isNotEmpty()) {
+            item(key = "artists") {
+                ArtistSearchSection(artists = artists, onOpen = onOpenArtist)
+            }
+        }
         itemsIndexed(state.results) { index, song ->
             SongRow(
                 song = song,
@@ -226,6 +245,73 @@ private fun SearchResultsList(
             }
         }
         item { Spacer(Modifier.height(72.dp)) }
+    }
+}
+
+@Composable
+private fun ArtistSearchSection(
+    artists: List<Artist>,
+    onOpen: (Artist) -> Unit
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(
+            "歌手",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+        artists.forEach { artist ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpen(artist) }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    Modifier
+                        .size(48.dp)
+                        .clip(MaterialTheme.shapes.medium)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (artist.picUrl.isNullOrBlank()) {
+                        Icon(
+                            Icons.Filled.Person,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        ArtworkImage(
+                            url = artist.picUrl,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        artist.name.ifBlank { "未知歌手" },
+                        style = MaterialTheme.typography.bodyLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        "查看热门歌曲",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+        }
     }
 }
 

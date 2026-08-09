@@ -94,6 +94,10 @@ export async function searchSongs(keyword, limit = 30, offset = 0) {
   return neteaseRequest("search", { s: keyword, type: 1, limit, offset });
 }
 
+export async function searchArtists(keyword, limit = 30, offset = 0) {
+  return neteaseRequest("search", { s: keyword, type: 100, limit, offset });
+}
+
 export async function getSongDetail(ids) {
   const idList = Array.isArray(ids) ? ids : [ids];
   const c = idList.map((id) => ({ id }));

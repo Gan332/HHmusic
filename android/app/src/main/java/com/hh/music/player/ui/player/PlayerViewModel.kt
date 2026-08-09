@@ -15,7 +15,8 @@ data class LyricState(
     val error: Boolean = false,
     val lyric: Lyric = Lyric(),
     val lines: List<LyricLine> = emptyList(),
-    val translations: Map<Long, String> = emptyMap()
+    val translations: Map<Long, String> = emptyMap(),
+    val romanizations: Map<Long, String> = emptyMap()
 )
 
 class PlayerViewModel(private val repository: MusicRepository) : ViewModel() {
@@ -39,7 +40,8 @@ class PlayerViewModel(private val repository: MusicRepository) : ViewModel() {
                         loading = false,
                         lyric = lrc,
                         lines = LyricParser.parse(lrc.lrc),
-                        translations = LyricParser.parse(lrc.tlyric).associate { it.timeMs to it.text }
+                        translations = LyricParser.translations(lrc.tlyric),
+                        romanizations = LyricParser.romanizations(lrc.romalrc)
                     )
                 }
                 .onFailure {

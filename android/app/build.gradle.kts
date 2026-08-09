@@ -13,8 +13,8 @@ android {
         applicationId = "com.hh.music.player"
         minSdk = 24
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.5"
+        versionCode = 6
+        versionName = "1.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -89,4 +89,5 @@ dependencies {
     // JVM unit tests: pure logic (PlaybackEngine / LyricParser / QueueCodec / Repository)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation("org.json:json:20240303")
 }

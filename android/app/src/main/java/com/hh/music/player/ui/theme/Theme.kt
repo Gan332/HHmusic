@@ -5,6 +5,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -94,6 +95,86 @@ private val DarkColors = darkColorScheme(
     surfaceContainerHighest = Color(0xFF313631)
 )
 
+private val BlueLight = LightColors.copy(
+    primary = Color(0xFF2E6FA3),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFD2E4FF),
+    onPrimaryContainer = Color(0xFF001D34),
+    inversePrimary = Color(0xFFA9C9F0),
+    secondary = Color(0xFF52606F),
+    onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFFD6E4F5),
+    onSecondaryContainer = Color(0xFF0F1D29),
+    tertiary = Color(0xFF00696D),
+    onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFF9CF1F5),
+    onTertiaryContainer = Color(0xFF002022),
+    surfaceTint = Color(0xFF2E6FA3)
+)
+
+private val BlueDark = DarkColors.copy(
+    primary = Color(0xFFA9C9F0),
+    onPrimary = Color(0xFF0A3050),
+    primaryContainer = Color(0xFF164A70),
+    onPrimaryContainer = Color(0xFFD2E4FF),
+    inversePrimary = Color(0xFF2E6FA3),
+    secondary = Color(0xFFBAC8D9),
+    onSecondary = Color(0xFF243240),
+    secondaryContainer = Color(0xFF3A4857),
+    onSecondaryContainer = Color(0xFFD6E4F5),
+    tertiary = Color(0xFF80D4D9),
+    onTertiary = Color(0xFF003739),
+    tertiaryContainer = Color(0xFF005053),
+    onTertiaryContainer = Color(0xFF9CF1F5),
+    surfaceTint = Color(0xFFA9C9F0)
+)
+
+private val OrangeLight = LightColors.copy(
+    primary = Color(0xFFB45E23),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFFFDCC3),
+    onPrimaryContainer = Color(0xFF3A1C00),
+    inversePrimary = Color(0xFFFFB784),
+    secondary = Color(0xFF745944),
+    onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFFFFDCC1),
+    onSecondaryContainer = Color(0xFF2A1707),
+    tertiary = Color(0xFF5B6291),
+    onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFFDEE1FF),
+    onTertiaryContainer = Color(0xFF151B48),
+    surfaceTint = Color(0xFFB45E23)
+)
+
+private val OrangeDark = DarkColors.copy(
+    primary = Color(0xFFFFB784),
+    onPrimary = Color(0xFF512400),
+    primaryContainer = Color(0xFF713800),
+    onPrimaryContainer = Color(0xFFFFDCC3),
+    inversePrimary = Color(0xFFB45E23),
+    secondary = Color(0xFFE6BE9F),
+    onSecondary = Color(0xFF3E2A19),
+    secondaryContainer = Color(0xFF57402E),
+    onSecondaryContainer = Color(0xFFFFDCC1),
+    tertiary = Color(0xFFBEC2F5),
+    onTertiary = Color(0xFF2A2F62),
+    tertiaryContainer = Color(0xFF42477A),
+    onTertiaryContainer = Color(0xFFDEE1FF),
+    surfaceTint = Color(0xFFFFB784)
+)
+
+private fun AppThemeColor.lightScheme(): ColorScheme = when (this) {
+    AppThemeColor.GREEN -> LightColors
+    AppThemeColor.BLUE -> BlueLight
+    AppThemeColor.ORANGE -> OrangeLight
+}
+
+private fun AppThemeColor.darkScheme(): ColorScheme = when (this) {
+    AppThemeColor.GREEN -> DarkColors
+    AppThemeColor.BLUE -> BlueDark
+    AppThemeColor.ORANGE -> OrangeDark
+}
+
 /** Expressive 形态：显著加大的圆角。 */
 private val ExpressiveShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
@@ -105,17 +186,24 @@ private val ExpressiveShapes = Shapes(
 
 @Composable
 fun HHMusicTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    themeColor: AppThemeColor = AppThemeColor.GREEN,
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
+    val systemDark = isSystemInDarkTheme()
+    val darkTheme = when (themeMode) {
+        AppThemeMode.SYSTEM -> systemDark
+        AppThemeMode.LIGHT -> false
+        AppThemeMode.DARK -> true
+    }
     val colors = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        darkTheme -> DarkColors
-        else -> LightColors
+        darkTheme -> themeColor.darkScheme()
+        else -> themeColor.lightScheme()
     }
 
     MaterialTheme(

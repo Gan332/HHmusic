@@ -69,6 +69,25 @@ class MusicRepository(
             page
         }
 
+    suspend fun searchArtists(keyword: String, limit: Int = 20, offset: Int = 0): Result<ArtistSearchPage> =
+        runCatching {
+            withContext(Dispatchers.IO) {
+                if (useBackend) {
+                    val resp = api.searchArtists(keyword, limit, offset)
+                    ArtistSearchPage(artists = resp.artists, total = resp.total)
+                } else {
+                    val fields = mapOf(
+                        "s" to keyword,
+                        "type" to "100",
+                        "limit" to limit.toString(),
+                        "offset" to offset.toString()
+                    )
+                    val body = DirectNcmClient.apiPost("cloudsearch/pc", fields)
+                    NcmParser.artistSearchPage(JSONObject(body))
+                }
+            }
+        }
+
     suspend fun songDetail(ids: List<Long>): Result<List<Song>> = runCatching {
         withContext(Dispatchers.IO) {
             if (useBackend) {
@@ -207,23 +226,28 @@ class MusicRepository(
         }
     }
 
-    suspend fun artistSongs(id: Long, limit: Int = 50, offset: Int = 0, order: String = "hot"): Result<List<Song>> = runCatching {
-        withContext(Dispatchers.IO) {
-            if (useBackend) {
-                api.artistSongs(id, limit, offset, order).songs
-            } else {
-                val fields = mapOf(
-                    "id" to id.toString(),
-                    "limit" to limit.toString(),
-                    "offset" to offset.toString(),
-                    "order" to order,
-                    "total" to "true"
-                )
-                val body = DirectNcmClient.apiPost("v1/artist/songs", fields)
-                NcmParser.songList(JSONObject(body), "songs")
+    suspend fun artistSongsPage(id: Long, limit: Int = 50, offset: Int = 0, order: String = "hot"): Result<ArtistSongsPage> =
+        runCatching {
+            withContext(Dispatchers.IO) {
+                if (useBackend) {
+                    val resp = api.artistSongs(id, limit, offset, order)
+                    ArtistSongsPage(songs = resp.songs, total = resp.total)
+                } else {
+                    val fields = mapOf(
+                        "id" to id.toString(),
+                        "limit" to limit.toString(),
+                        "offset" to offset.toString(),
+                        "order" to order,
+                        "total" to "true"
+                    )
+                    val body = DirectNcmClient.apiPost("v1/artist/songs", fields)
+                    NcmParser.artistSongsPage(JSONObject(body))
+                }
             }
         }
-    }
+
+    suspend fun artistSongs(id: Long, limit: Int = 50, offset: Int = 0, order: String = "hot"): Result<List<Song>> =
+        artistSongsPage(id, limit, offset, order).map { it.songs }
 
     suspend fun newSongs(limit: Int = 30): Result<List<Song>> = runCatching {
         withContext(Dispatchers.IO) {

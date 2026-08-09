@@ -28,7 +28,11 @@ data class Song(
 }
 
 @Serializable
-data class Artist(val id: Long = 0, val name: String = "")
+data class Artist(
+    val id: Long = 0,
+    val name: String = "",
+    val picUrl: String? = null
+)
 
 @Serializable
 data class Album(
@@ -78,6 +82,20 @@ data class SavedQueue(
 /** One page of search results (songs + total count for pagination). */
 @Serializable
 data class SearchPage(
+    val songs: List<Song> = emptyList(),
+    val total: Int = 0
+)
+
+/** One page of cloud-search artist results (type=100). */
+@Serializable
+data class ArtistSearchPage(
+    val artists: List<Artist> = emptyList(),
+    val total: Int = 0
+)
+
+/** Artist song list with the upstream total for pagination. */
+@Serializable
+data class ArtistSongsPage(
     val songs: List<Song> = emptyList(),
     val total: Int = 0
 )

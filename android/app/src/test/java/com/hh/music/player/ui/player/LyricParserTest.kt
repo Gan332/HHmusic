@@ -60,6 +60,14 @@ class LyricParserTest {
     }
 
     @Test
+    fun `romanization map is keyed by exact time`() {
+        val r = LyricParser.romanizations("[00:03.00]piao a piao\n[01:02.50]mei you hui da")
+        assertEquals(2, r.size)
+        assertEquals("piao a piao", r[3_000L])
+        assertEquals("mei you hui da", r[62_500L])
+    }
+
+    @Test
     fun `fractional seconds with one or two digits scale correctly`() {
         // ".5" = 500ms, ".05" = 50ms, ".1" = 100ms
         assertEquals(500L, LyricParser.parse("[00:01.5]a")[0].timeMs)

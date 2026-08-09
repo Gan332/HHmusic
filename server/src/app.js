@@ -3,6 +3,7 @@ import cors from "cors";
 import { randomUUID } from "node:crypto";
 import {
   searchSongs,
+  searchArtists,
   getSongDetail,
   getSongUrl,
   getLyric,
@@ -30,6 +31,7 @@ const asyncHandler = (fn) => (req, res, next) =>
 export function createApp(deps = {}) {
   const api = {
     searchSongs,
+    searchArtists,
     getSongDetail,
     getSongUrl,
     getLyric,
@@ -263,6 +265,31 @@ export function createApp(deps = {}) {
         creator: { nickname: (p.creator ?? {}).nickname },
       }));
       sendResult(res, { status: 200, data: { code: 200, list } });
+    })
+  );
+
+  app.get(
+    "/api/artist/search",
+    asyncHandler(async (req, res) => {
+      const keyword = (req.query.s ?? req.query.keyword ?? "").toString().trim();
+      if (!keyword) return res.status(400).json({ code: 400, msg: "missing keyword" });
+      const limit = limitParam(req.query.limit, 30);
+      const offset = Math.max(0, toInt(req.query.offset, 0));
+      const r = await api.searchArtists(keyword, limit, offset);
+      const result = r.data?.result ?? {};
+      const artists = (result.artists ?? []).map((a) => ({
+        id: a.id,
+        name: a.name,
+        picUrl: a.img1v1Url ?? a.picUrl ?? null,
+      }));
+      sendResult(res, {
+        status: 200,
+        data: {
+          code: 200,
+          total: result.artistCount ?? result.count ?? 0,
+          artists,
+        },
+      });
     })
   );
 

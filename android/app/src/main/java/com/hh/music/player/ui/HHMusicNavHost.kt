@@ -17,6 +17,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -28,6 +29,7 @@ import com.hh.music.player.data.local.LocalStore
 import com.hh.music.player.data.offline.DownloadManager
 import com.hh.music.player.playback.EqualizerController
 import com.hh.music.player.playback.PlayerController
+import com.hh.music.player.ui.artist.ArtistScreen
 import com.hh.music.player.ui.library.LibraryScreen
 import com.hh.music.player.ui.settings.SettingsScreen
 import com.hh.music.player.ui.discover.DiscoverScreen
@@ -44,10 +46,12 @@ object Routes {
     const val LIBRARY = "library"
     const val SETTINGS = "settings"
     const val PLAYLIST = "playlist/{id}"
+    const val ARTIST = "artist/{id}/{name}"
     const val PLAYER = "player"
 
     fun playlist(id: Long) = "playlist/$id"
     fun search(keyword: String = "") = "search?keyword=${Uri.encode(keyword)}"
+    fun artist(id: Long, name: String) = "artist/$id/${Uri.encode(name)}"
 }
 
 /** Provides the app-wide player controller to composables. */
@@ -137,7 +141,27 @@ fun HHMusicNavHost(container: AppContainer) {
                     SearchScreen(
                         repository = container.repository,
                         onOpenPlayer = { navController.navigate(Routes.PLAYER) },
-                        initialQuery = keyword
+                        initialQuery = keyword,
+                        onOpenArtist = { artist ->
+                            navController.navigate(Routes.artist(artist.id, artist.name))
+                        }
+                    )
+                }
+                composable(
+                    route = Routes.ARTIST,
+                    arguments = listOf(
+                        navArgument("id") { type = NavType.LongType },
+                        navArgument("name") { type = NavType.StringType }
+                    )
+                ) { backStackEntry ->
+                    val id = backStackEntry.arguments?.getLong("id") ?: 0L
+                    val name = backStackEntry.arguments?.getString("name").orEmpty()
+                    ArtistScreen(
+                        artistId = id,
+                        artistName = name,
+                        repository = container.repository,
+                        onBack = { navController.popBackStack() },
+                        onOpenPlayer = { navController.navigate(Routes.PLAYER) }
                     )
                 }
                 composable(Routes.TOPLIST) {

@@ -1,6 +1,7 @@
 package com.hh.music.player.network
 
 import com.hh.music.player.data.Lyric
+import com.hh.music.player.data.Artist
 import com.hh.music.player.data.Playlist
 import com.hh.music.player.data.SearchResponse
 import com.hh.music.player.data.Song
@@ -57,6 +58,13 @@ interface HHMusicApi {
         @Query("order") order: String = "hot"
     ): ArtistSongsResponse
 
+    @GET("artist/search")
+    suspend fun searchArtists(
+        @Query("s") keyword: String,
+        @Query("limit") limit: Int = 20,
+        @Query("offset") offset: Int = 0
+    ): ArtistSearchResponse
+
     @GET("new/song")
     suspend fun newSongs(@Query("limit") limit: Int = 30): SongDetailResponse
 }
@@ -91,4 +99,11 @@ data class ArtistSongsResponse(
     val code: Int = 0,
     val total: Int = 0,
     val songs: List<Song> = emptyList()
+)
+
+@Serializable
+data class ArtistSearchResponse(
+    val code: Int = 0,
+    val total: Int = 0,
+    val artists: List<Artist> = emptyList()
 )

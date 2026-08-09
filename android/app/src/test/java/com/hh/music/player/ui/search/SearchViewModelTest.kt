@@ -4,6 +4,7 @@ import com.hh.music.player.data.MusicRepository
 import com.hh.music.player.data.SearchResponse
 import com.hh.music.player.data.Song
 import com.hh.music.player.network.ArtistSongsResponse
+import com.hh.music.player.network.ArtistSearchResponse
 import com.hh.music.player.network.HHMusicApi
 import com.hh.music.player.network.LikeBody
 import com.hh.music.player.network.LikeResponse
@@ -48,6 +49,8 @@ class SearchViewModelTest {
         override suspend fun recommendPlaylists(limit: Int): RecommendPlaylistResponse = throw UnsupportedOperationException()
         override suspend fun artistSongs(id: Long, limit: Int, offset: Int, order: String): ArtistSongsResponse =
             throw UnsupportedOperationException()
+        override suspend fun searchArtists(keyword: String, limit: Int, offset: Int): ArtistSearchResponse =
+            ArtistSearchResponse()
         override suspend fun newSongs(limit: Int) = throw UnsupportedOperationException()
     }
 

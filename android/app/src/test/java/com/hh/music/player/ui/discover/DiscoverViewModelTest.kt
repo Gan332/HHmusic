@@ -7,6 +7,7 @@ import com.hh.music.player.data.Song
 import com.hh.music.player.data.SongDetailResponse
 import com.hh.music.player.data.SongUrl
 import com.hh.music.player.network.ArtistSongsResponse
+import com.hh.music.player.network.ArtistSearchResponse
 import com.hh.music.player.network.HHMusicApi
 import com.hh.music.player.network.LikeBody
 import com.hh.music.player.network.LikeResponse
@@ -70,6 +71,8 @@ class DiscoverViewModelTest {
         override suspend fun toplist(): ToplistResponse = throw UnsupportedOperationException()
         override suspend fun likeSong(body: LikeBody): LikeResponse = throw UnsupportedOperationException()
         override suspend fun artistSongs(id: Long, limit: Int, offset: Int, order: String): ArtistSongsResponse =
+            throw UnsupportedOperationException()
+        override suspend fun searchArtists(keyword: String, limit: Int, offset: Int): ArtistSearchResponse =
             throw UnsupportedOperationException()
     }
 

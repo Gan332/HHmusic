@@ -12,7 +12,9 @@ data class DownloadStatus(
     /** 0..100 while [DownloadState.DOWNLOADING]; 100 when done. */
     val progress: Int = 0,
     /** Failure reason for [DownloadState.ERROR] (VIP / copyright / network). */
-    val error: String? = null
+    val error: String? = null,
+    /** Song shown in the live progress row while no download record exists yet. */
+    val song: Song? = null
 )
 
 /**

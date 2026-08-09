@@ -2,10 +2,14 @@ package com.hh.music.player.ui.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hh.music.player.data.Artist
+import com.hh.music.player.data.ArtistSearchPage
 import com.hh.music.player.data.MusicRepository
 import com.hh.music.player.data.Song
 import com.hh.music.player.data.local.LocalStore
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +24,8 @@ data class SearchState(
     val results: List<Song> = emptyList(),
     val total: Int = 0,
     val loadingMore: Boolean = false,
-    val loadMoreError: String? = null
+    val loadMoreError: String? = null,
+    val artists: List<Artist> = emptyList()
 ) {
     val hasMore: Boolean get() = results.isNotEmpty() && results.size < total
 }
@@ -45,7 +50,15 @@ class SearchViewModel(
         _state.update { it.copy(query = q) }
         searchJob?.cancel()
         if (q.isBlank()) {
-            _state.update { it.copy(results = emptyList(), error = null, loading = false, total = 0) }
+            _state.update {
+                it.copy(
+                    results = emptyList(),
+                    artists = emptyList(),
+                    error = null,
+                    loading = false,
+                    total = 0
+                )
+            }
             return
         }
         searchJob = viewModelScope.launch {
@@ -64,20 +77,42 @@ class SearchViewModel(
     private suspend fun doSearch(q: String) {
         val seq = ++searchSeq
         _state.update {
-            it.copy(loading = true, error = null, loadingMore = false, loadMoreError = null, total = 0)
+            it.copy(
+                loading = true,
+                error = null,
+                loadingMore = false,
+                loadMoreError = null,
+                total = 0
+            )
         }
-        repository.search(q, limit = PAGE_SIZE, offset = 0)
-            .onSuccess { page ->
-                if (seq != searchSeq) return@onSuccess
+        coroutineScope {
+            val songs = async { repository.search(q, limit = PAGE_SIZE, offset = 0) }
+            val artists = async { repository.searchArtists(q, limit = 12).getOrDefault(ArtistSearchPage()) }
+            val songResult = songs.await()
+            val artistPage = artists.await()
+            if (seq != searchSeq) return@coroutineScope
+            songResult.onSuccess { page ->
                 _state.update {
-                    it.copy(loading = false, results = page.songs, total = page.total)
+                    it.copy(
+                        loading = false,
+                        results = page.songs,
+                        total = page.total,
+                        artists = artistPage.artists
+                    )
                 }
                 local?.addSearchHistory(q)
             }
             .onFailure { e ->
                 if (seq != searchSeq) return@onFailure
-                _state.update { it.copy(loading = false, error = e.message ?: "搜索失败") }
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        artists = artistPage.artists,
+                        error = if (artistPage.artists.isEmpty()) e.message ?: "搜索失败" else null
+                    )
+                }
             }
+        }
     }
 
     /** Fetch the next page (offset = current result count) and append it. */

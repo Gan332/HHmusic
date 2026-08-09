@@ -1,188 +1,123 @@
 # HH音乐 · 网易云第三方音乐播放器（Android）
 
-一个基于网易云接口的第三方音乐播放器。
+一个基于网易云接口的第三方音乐播放器，客户端直接内建 eapi 加密（移植自 [GuitaristRin/Ncrust](https://github.com/GuitaristRin/Ncrust)），默认无需后端即可联网搜索、取歌词并播放。`server/` 保留为可选的 Node/Express weapi 代理。
 
-> **v1.2 起：App 直连网易云，无需本机后端。** 客户端内置 eapi 加密（移植自 [GuitaristRin/Ncrust](https://github.com/GuitaristRin/Ncrust)），直接访问 `music.163.com`；歌曲地址还有公开「outer url」兜底，连 cookie 都不用登录即可播大量歌曲。`server/` 仅作可选的传统 weapi 代理保留。
-
-```
-┌─────────────────┐   eapi加密/直连https    ┌─────────────────┐
-│   Android App   │ ───────────────────────▶│  网易云 music.163│
-│ Compose/ExoPlayer│◀───────────────────────│                 │
-└─────────────────┘                         └─────────────────┘
-        (无需本机后端；server/ 为可选)
+```text
+┌────────────────────┐   eapi 加密/直连 https   ┌────────────────────┐
+│ Android App        │ ────────────────────────> │ 网易云 music.163   │
+│ Compose / Media3   │ <──────────────────────── │                    │
+└────────────────────┘                          └────────────────────┘
+        server/ 仅作可选代理，不开也能用
 ```
 
-组件：
-- `android/` — 原生 Android 客户端（Kotlin + Jetpack Compose + Media3/ExoPlayer），内置 eapi 直连。
-- `server/` — Node.js/Express 后端代理（可选，weapi 签名，统一 JSON），历史保留。
+## 功能清单（v1.6）
 
-## 功能
+### 主题与外观
+- 主题模式：跟随系统 / 浅色 / 深色，重启后保持。
+- 主题色：云岭绿（默认）/ 夜帆蓝 / 炽阳橙。
+- 动态取色：Android 12+ 可选，壁纸主题色优先于固定主题色。
+- 系统栏样式、播放页背景、MiniPlayer 与弹层随主题统一切换。
 
-- 🔍 关键词搜索歌曲 / 歌手
-- ▶️ 播放、暂停、上一首 / 下一首、拖动进度
-- 📃 播放队列（可点选跳转）
-- 🎼 实时滚动歌词（带时间轴 & 翻译）
-- 🏆 排行榜 / 歌单浏览与一键播放
-- 🎚 通知栏 / MediaSession 控制（锁屏可控）
-- 🎨 仿网易云深色绿色主题
+### 搜索与歌手
+- 关键词搜索歌曲与歌手；搜索页展示歌手结果区。
+- 歌手页：热门 / 最新歌曲切换、播放全部、分页加载更多、单曲长按操作。
+- v1 歌手页只提供歌曲列表，专辑 Tab 留待后续版本。
 
-## 一、（可选）启动后端代理
+### 歌词与播放页
+- 歌词行点击可跳转定位。
+- 显示翻译、显示罗马音（`romalrc`）开关。
+- 歌词字号：小 / 中 / 大。
+- 进度滑块、倍速、定时关闭、均衡器、播放队列、离线缓存联动。
 
-> **默认无需启动。** v1.2 起 App 直连网易云。仅当你想用后端走 weapi 代理时，才启动它，并把 `MusicRepository.USE_BACKEND` 改为 `true`。
+### 音乐库与下载
+- 收藏歌曲、最近播放、收藏歌单。
+- 本地音乐：MediaStore 扫描 + SAF 导入，快速标题/歌手筛选，失效 URI 自动清理。
+- 下载页：下载中进度、已下载管理、失败重试、清空失败记录。
+- 设置页：自动缓存开关、缓存上限（256MB / 512MB / 1GB / 2GB / 不限）。
+
+## 构建与运行
+
+### Android
+
+从 Android Studio 打开 `android/` 并运行 `app`；也可以使用命令行：
+
+```bash
+cd android
+.\gradlew.bat testDebugUnitTest
+.\gradlew.bat assembleDebug
+.\gradlew.bat assembleRelease
+```
+
+要求：JDK 17+、Android SDK 35、Android Studio 最新稳定版。
+
+### Server（可选）
+
+默认 App 直连网易云，不需要启动 server。若要在本地跑 weapi 代理：
 
 ```bash
 cd server
 npm install
-npm start          # 默认监听 http://localhost:3000
+npm start        # http://localhost:3000
+npm run dev      # watch 模式
+npm test         # node --test tests/routes.test.js（Windows / Node 22 兼容）
 ```
 
-健康检查：
-
-```bash
-curl http://localhost:3000/api/health
-```
-
-可用接口：
+## Server 接口
 
 | 接口 | 说明 |
 |------|------|
-| `GET /api/search?s=周杰伦&limit=30` | 搜索歌曲 |
-| `GET /api/song/detail?ids=5257138,210049` | 歌曲详情 |
-| `GET /api/song/url?id=5257138&level=exhigh` | 获取播放地址（mp3/flac） |
-| `GET /api/lyric?id=5257138` | 获取歌词 |
+| `GET /api/search?s=周杰伦&limit=30` | 歌曲搜索 |
+| `GET /api/artist/search?s=周杰伦&limit=30` | 歌手搜索（type=100） |
+| `GET /api/artist/songs?id=6452&limit=50&order=hot` | 歌手歌曲（hot/time） |
+| `GET /api/song/detail?ids=123,456` | 歌曲详情 |
+| `GET /api/song/url?id=123&level=exhigh` | 播放地址 |
+| `GET /api/lyric?id=123` | 歌词（lrc/tlyric/romalrc/yrc） |
 | `GET /api/playlist/detail?id=19723756` | 歌单详情 |
 | `GET /api/toplist` | 排行榜列表 |
-| `POST /api/song/like`        body `{"id":123,"like":true}` | 喜欢歌曲 |
-
-## 二、运行 Android 客户端（开箱即用，无需后端）
-
-App 直连网易云，装上即用。可选：登录后可播 VIP 曲目 —— 在 `DirectNcmClient.setCookie(\"MUSIC_U=...\")` 注入 cookie。
-
-> 后端方案见第一节（可选）。默认 `MusicRepository.USE_BACKEND=false`。
-### 2. 用 Android Studio 打开并运行
-
-1. 打开 Android Studio → `Open` → 选择 `D:\HHmusic\android` 目录。
-2. 等待 Gradle 同步下载依赖（首次需要联网，约几分钟）。
-3. 选择设备 / 模拟器，点击 ▶️ Run。
-
-> 要求：Android Studio Hedgehog 及以上、JDK 17+、Android SDK API 34。
-> 本机已检测到 JDK 21（Corretto），Android SDK 由 Android Studio 提供。
+| `GET /api/recommend/songs?limit=30` | 每日推荐 |
+| `GET /api/recommend/playlists?limit=12` | 推荐歌单 |
+| `GET /api/new/song?limit=30` | 新歌速递 |
+| `POST /api/song/like` | 喜欢歌曲，body `{"id":123,"like":true}` |
+| `GET /api/health` | 健康检查 |
 
 ## 技术栈
 
-**后端**：Node.js、Express、网易云 weapi 自实现加密（AES-128-CBC + RSA）。
+- Android：Kotlin、Jetpack Compose（Material 3 Expressive）、Navigation Compose、Media3/ExoPlayer + MediaSession。
+- 数据持久化：DataStore Preferences + kotlinx.serialization。
+- 网络：直接 NetEase eapi（默认）或 Retrofit + Node server（可选）。
+- Server：Node.js、Express、自实现 weapi 加密（AES-128-CBC + RSA）。
 
-**客户端**：
-- UI：Jetpack Compose、Material 3
-- 播放：Media3 / ExoPlayer + MediaSession（前台服务 + 通知栏）
-- 网络：Retrofit + kotlinx.serialization + OkHttp
-- 图片：Coil
-- 架构：单 Activity + Navigation Compose + 手动依赖注入（AppContainer）
+## 版本记录
 
-## 目录结构
+### v1.6（当前）
+- 用户可控主题：system/light/dark、绿/蓝/橙、动态取色。
+- 歌手搜索与歌手页。
+- 歌词行点击跳转、翻译/罗马音开关、三档字号。
+- 本地音乐标题/歌手筛选；下载页失败记录清空。
+- Server 更新到 Windows/Node 22 可用的测试脚本，并新增 artist/search 接口测试。
+- Android 版本号 `1.6`（versionCode 6）。
 
-```
-D:\HHmusic
-├─ server/                     后端代理
-│  ├─ src/
-│  │  ├─ crypto.js             weapi 加密（AES+RSA）
-│  │  ├─ netease.js            网易云接口封装
-│  │  └─ index.js              Express 路由（/api/*）
-│  └─ package.json
-└─ android/                    Android 客户端
-   ├─ app/
-   │  ├─ build.gradle.kts
-   │  └─ src/main/
-   │     ├─ AndroidManifest.xml
-   │     ├─ res/               主题/图标/字符串
-   │     └─ java/com/hh/music/player/
-   │        ├─ MainActivity.kt / HHMusicApp.kt
-   │        ├─ data/           数据模型 / Repository / AppContainer
-   │        ├─ network/        Retrofit API / 网络模块
-   │        ├─ playback/       PlaybackService / PlayerController
-   │        └─ ui/             搜索 / 播放器 / 歌单 / 主题 / 组件
-   ├─ build.gradle.kts
-   ├─ settings.gradle.kts
-   ├─ gradle.properties
-   ├─ gradle/libs.versions.toml
-   └─ gradle/wrapper/          Gradle Wrapper
-```
+### v1.5
+- 播放队列弹层：数量 / 总时长 / 上移下移 / 移顶移底 / 移除。
+- 倍速、定时关闭、均衡器。
+- 播放失败自动兜底与重试。
+
+### v1.4
+- 歌词滚动 O(n) 优化。
+- URL 解析失败自动切下一首 / 重试一次。
+- 下一首预解析、连接重试指数退避、LRU 缓存。
+- Release R8 混淆 + 资源压缩。
+
+### v1.3
+- 进度、歌词、控件重组隔离与卡顿修复。
+- 音乐库页、设置页（数据源 / 音质 / 进度样式）。
+
+### v1.2
+- App 直连网易云 eapi，默认无需 backend。
+
+### v1.1
+- 底部导航 / 发现页 / 我的、收藏、最近播放、播放模式、搜索历史、本地持久化。
 
 ## 免责声明
 
-本项目仅供学习交流使用，接口与资源版权归网易云音乐所有。请勿用于商业用途。
-
-
-## v1.1 新增功能
-
-> 后端已扩展 4 个接口、客户端新增「发现 / 我的」页与本地持久化。
-
-### 新接口（后端 `server/`）
-
-| 接口 | 说明 |
-|------|------|
-| `GET /api/recommend/songs?limit=30` | 每日推荐 |
-| `GET /api/recommend/playlists?limit=12` | 推荐歌单 |
-| `GET /api/artist/songs?id=6452&limit=50&order=hot` | 歌手热门歌曲（order=hot/time） |
-| `GET /api/new/song?limit=30` | 新歌速递 |
-
-### Android 新功能
-
-- 🧭 **底部导航重构**：发现 / 搜索 / 排行榜 / 我的，四大 Tab 切换
-- 🔭 **发现页**：每日推荐 + 新歌速递 + 推荐歌单（卡片网格），一键播放
-- ❤️ **我的**：收藏歌曲 / 最近播放 / 收藏歌单，三个子 Tab；最近可清空
-- 🔖 **本地持久化**（DataStore）：收藏、最近播放（最多 50）、歌单收藏、播放模式、搜索历史全部本地保存
-- 🔁 **播放模式**：顺序播放 / 单曲循环 / 随机播放，循环切换并持久化
-- 🕘 **搜索历史**：空态展示历史关键词，点选即搜，可清空
-- ❤️ **收藏按钮**：播放页歌曲收藏、歌单详情页收藏歌单
-- 🎵 播放/切歌时自动记录到「最近播放」
-
-### 架构图
-
-```mermaid
-flowchart LR
-    A[Android UI: Compose] --> PC[PlayerController\n队列/模式/进度]
-    PC --> PS[PlaybackService\nExoPlayer+MediaSession]
-    A --> Repo[MusicRepository]
-    Repo --> LS[LocalStore\nDataStore: 收藏/最近/历史/模式]
-    Repo --> Net[Retrofit API]
-    Net --> BE[Node 后端 /api/*]
-    BE --> NE(网易云 weapi)
-```
-
-
-
-## v1.3 性能修复 + 设置 + 音乐库
-
-### 🚀 卡顿修复
-- **进度刷新去抖**：进度以「秒」为粒度推送，且只在播放中更新，避免每 500ms 整屏重组
-- **resolveUrlFor 重构**：不再每次切歌都 `prepare()` 重置播放器（曾导致音频重缓冲卡顿）；改为仅热替换当前项 URI，且复用已解析的 URL 缓存
-- **PlayerScreen 重组隔离**：进度滑块、歌词各自独立可组合作用域；歌词高亮用 `derivedStateOf`，只有「当前行变化」才触发滚动，不再每秒重组整页
-
-### ⚙️ 设置页
-- 数据源切换：直连网易云（默认）/ 本地后端代理
-- 默认音质：标准 / 较高 / 极高 / 无损 / Hi-Res
-- 关于：版本、接口来源、参考项目
-
-### 📚 音乐库页
-底部导航新增「音乐库」Tab，统一入口：
-- 我收藏的歌曲（点选即播整个收藏队列）
-- 最近播放
-- 收藏的歌单（点开进歌单详情）
-
-### 🧭 底部导航
-v1.3 调整为：**发现 / 搜索 / 音乐库 / 设置** 四个 Tab；排行榜改为「发现」页入口。
-
-## v1.4 性能与体积优化
-
-- 🎼 **歌词滚动修复**：`indexOf` 逐行全表扫描（O(n²)）改为索引直取，长歌词列表滚动不再逐行重组
-- 🛡 **播放兜底**：歌曲地址解析失败自动切下一首（解析中则重试一次），不再无声停止
-- ⏭ **预解析**：切歌后预取下一首播放地址，连播不再等网络
-- 🔁 **连接重试修复**：`playQueue` 在控制器未就绪时由 300ms 死循环改为指数退避（1s→32s）重连 + 待播队列补放
-- 🗄 **内存缓存**：歌词 / 搜索结果 LRU 缓存，重复查看秒开不重新请求
-- 🔇 **日志治理**：release 构建关闭 OkHttp 日志（隐私 + 性能）
-- 📦 **APK 体积**：release 开启 R8 混淆 + 资源压缩；移除未使用的 `media3-ui` 依赖
-
-## v1.5 播放队列增强
-
-- ▶️ **队列弹层**：展示歌曲数量与总时长，支持上移/下移、移到顶部/底部、从队列移除等快捷操作。
+项目仅供学习交流，所有接口与资源版权归网易云音乐所有。请勿用于商业用途。

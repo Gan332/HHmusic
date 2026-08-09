@@ -105,6 +105,7 @@ class DownloadManager(
         scope.launch {
             if (fileFor(song.id) != null) return@launch
             if (_statuses.value[song.id]?.state == DownloadState.DOWNLOADING) return@launch
+            _statuses.value = _statuses.value + (song.id to DownloadStatus(DownloadState.DOWNLOADING, song = song))
             val result = runCatching {
                 val urlInfo = repository.songUrl(song.id).getOrThrow()
                 val url = urlInfo.url
@@ -113,7 +114,7 @@ class DownloadManager(
             }
             result.fold(
                 onSuccess = { entry ->
-                    _statuses.value = _statuses.value + (song.id to DownloadStatus(DownloadState.DONE, 100))
+                    _statuses.value = _statuses.value + (song.id to DownloadStatus(DownloadState.DONE, 100, song = song))
                     _entries.value = (_entries.value.filter { it.id != song.id } + entry)
                             .sortedByDescending { it.downloadedAt }
                     local.setDownloads(_entries.value)
@@ -122,7 +123,9 @@ class DownloadManager(
                 onFailure = { e ->
                     File(downloadsDir, "tmp_${song.id}").delete() // drop a half-written file
                     val reason = e.message?.takeIf { it.isNotBlank() } ?: "下载失败"
-                    _statuses.value = _statuses.value + (song.id to DownloadStatus(DownloadState.ERROR, 0, reason))
+                    _statuses.value = _statuses.value + (
+                        song.id to DownloadStatus(DownloadState.ERROR, 0, reason, song = song)
+                    )
                     val failed = DownloadEntry(song = song, error = reason)
                     _entries.value = _entries.value.filter { it.id != song.id } + failed
                     local.setDownloads(_entries.value)
@@ -142,12 +145,13 @@ class DownloadManager(
         scope.launch {
             if (fileFor(song.id) != null) return@launch
             if (_statuses.value[song.id]?.state == DownloadState.DOWNLOADING) return@launch
+            _statuses.value = _statuses.value + (song.id to DownloadStatus(DownloadState.DOWNLOADING, song = song))
             val result = runCatching {
                 downloadToFile(song, resolvedUrl, extractFromUrl(resolvedUrl))
             }
             result.fold(
                 onSuccess = { entry ->
-                    _statuses.value = _statuses.value + (song.id to DownloadStatus(DownloadState.DONE, 100))
+                    _statuses.value = _statuses.value + (song.id to DownloadStatus(DownloadState.DONE, 100, song = song))
                     _entries.value = (_entries.value.filter { it.id != song.id } + entry)
                             .sortedByDescending { it.downloadedAt }
                     local.setDownloads(_entries.value)
@@ -156,6 +160,7 @@ class DownloadManager(
                 onFailure = {
                     // auto-cache failures stay silent (VIP/copyright) — no error entry
                     File(downloadsDir, "tmp_${song.id}").delete()
+                    _statuses.value = _statuses.value - song.id
                 }
             )
         }
@@ -167,6 +172,17 @@ class DownloadManager(
             filesFor(songId).forEach { it.delete() }
             _entries.value = _entries.value.filter { it.id != songId }
             _statuses.value = _statuses.value - songId
+            local.setDownloads(_entries.value)
+        }
+    }
+
+    /** Delete failed markers only; finished downloads stay untouched. */
+    fun clearFailed() {
+        scope.launch {
+            val failedIds = _entries.value.filter { it.isFailed }.map { it.id }.toSet()
+            if (failedIds.isEmpty()) return@launch
+            _entries.value = _entries.value.filterNot { it.isFailed }
+            _statuses.value = _statuses.value.filterKeys { it !in failedIds }
             local.setDownloads(_entries.value)
         }
     }

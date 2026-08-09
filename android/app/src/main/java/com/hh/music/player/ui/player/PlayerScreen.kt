@@ -1,6 +1,7 @@
 package com.hh.music.player.ui.player
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -33,6 +34,7 @@ import com.hh.music.player.ui.LocalPlayerController
 import com.hh.music.player.ui.LocalStoreProvider
 import com.hh.music.player.ui.LocalEqualizerController
 import com.hh.music.player.ui.ProgressStyle
+import com.hh.music.player.ui.theme.LyricFontScale
 import com.hh.music.player.ui.components.ArtworkImage
 import com.hh.music.player.ui.components.SongActionsSheet
 import com.hh.music.player.ui.components.WaveformSlider
@@ -299,6 +301,7 @@ fun PlayerScreen(
                 lyricState = lyricState,
                 positionFlow = player.positionMs,
                 onRetryLyric = { song?.id?.let { vm.loadLyric(it) } },
+                onSeek = player::seekTo,
                 modifier = Modifier.weight(1f).fillMaxWidth()
             )
 
@@ -624,10 +627,27 @@ private fun LyricsSection(
     lyricState: LyricState,
     positionFlow: kotlinx.coroutines.flow.StateFlow<Long>,
     onRetryLyric: () -> Unit,
+    onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val lyricList = lyricState.lines
     val position by positionFlow.collectAsState()
+    val store = LocalStoreProvider.current
+    val scope = rememberCoroutineScope()
+    val showTranslation by store.showLyricTranslation.collectAsState(initial = true)
+    val showRomanization by store.showLyricRomanization.collectAsState(initial = false)
+    val fontScaleKey by store.lyricFontScale.collectAsState(initial = LyricFontScale.MEDIUM.key)
+    val fontScale = LyricFontScale.from(fontScaleKey)
+    val lineStyle = when (fontScale) {
+        LyricFontScale.SMALL -> MaterialTheme.typography.bodyMedium
+        LyricFontScale.MEDIUM -> MaterialTheme.typography.bodyLarge
+        LyricFontScale.LARGE -> MaterialTheme.typography.titleMedium
+    }
+    val secondaryStyle = when (fontScale) {
+        LyricFontScale.SMALL -> MaterialTheme.typography.bodySmall
+        LyricFontScale.MEDIUM -> MaterialTheme.typography.bodySmall
+        LyricFontScale.LARGE -> MaterialTheme.typography.bodyMedium
+    }
     val activeIndex by remember(lyricList) {
         derivedStateOf {
             var idx = -1
@@ -647,30 +667,63 @@ private fun LyricsSection(
 
     Box(modifier) {
         when {
-            lyricList.isNotEmpty() -> LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(vertical = 32.dp)
-            ) {
-                itemsIndexed(lyricList) { index, line ->
-                    val active = index == activeIndex
-                    Text(
-                        text = line.text.ifBlank { "♪" },
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                        color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
-                    )
-                    lyricState.translations[line.timeMs]?.let { trans ->
+            lyricList.isNotEmpty() -> Column(Modifier.fillMaxSize()) {
+                LyricOptionsRow(
+                    showTranslation = showTranslation,
+                    showRomanization = showRomanization,
+                    fontScale = fontScale,
+                    onToggleTranslation = {
+                        scope.launch { store.setShowLyricTranslation(!showTranslation) }
+                    },
+                    onToggleRomanization = {
+                        scope.launch { store.setShowLyricRomanization(!showRomanization) }
+                    },
+                    onFontScale = { font ->
+                        scope.launch { store.setLyricFontScale(font.key) }
+                    }
+                )
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentPadding = PaddingValues(vertical = 20.dp)
+                ) {
+                    itemsIndexed(lyricList) { index, line ->
+                        val active = index == activeIndex
                         Text(
-                            trans,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (active) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            text = line.text.ifBlank { "♪" },
+                            style = lineStyle,
+                            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                            color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSeek(line.timeMs) }
+                                .padding(vertical = 5.dp)
                         )
+                        if (showRomanization) {
+                            lyricState.romanizations[line.timeMs]?.let { roma ->
+                                Text(
+                                    roma,
+                                    style = secondaryStyle,
+                                    color = if (active) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
+                                )
+                            }
+                        }
+                        if (showTranslation) {
+                            lyricState.translations[line.timeMs]?.let { trans ->
+                                Text(
+                                    trans,
+                                    style = secondaryStyle,
+                                    color = if (active) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -688,6 +741,89 @@ private fun LyricsSection(
                 modifier = Modifier.align(Alignment.Center)
             )
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LyricOptionsRow(
+    showTranslation: Boolean,
+    showRomanization: Boolean,
+    fontScale: LyricFontScale,
+    onToggleTranslation: () -> Unit,
+    onToggleRomanization: () -> Unit,
+    onFontScale: (LyricFontScale) -> Unit
+) {
+    var fontMenu by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TooltipBox(
+            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+            tooltip = { PlainTooltip { Text(if (showTranslation) "隐藏翻译" else "显示翻译") } },
+            state = rememberTooltipState()
+        ) {
+            IconButton(onClick = onToggleTranslation) {
+                Icon(
+                    Icons.Filled.Translate,
+                    contentDescription = "翻译",
+                    tint = if (showTranslation) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        TooltipBox(
+            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+            tooltip = { PlainTooltip { Text(if (showRomanization) "隐藏罗马音" else "显示罗马音") } },
+            state = rememberTooltipState()
+        ) {
+            IconButton(onClick = onToggleRomanization) {
+                Icon(
+                    Icons.Filled.Subtitles,
+                    contentDescription = "罗马音",
+                    tint = if (showRomanization) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Box {
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                tooltip = { PlainTooltip { Text("歌词字号") } },
+                state = rememberTooltipState()
+            ) {
+                IconButton(onClick = { fontMenu = true }) {
+                    Icon(
+                        Icons.Filled.FormatSize,
+                        contentDescription = "歌词字号",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            DropdownMenu(expanded = fontMenu, onDismissRequest = { fontMenu = false }) {
+                LyricFontScale.entries.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text("${option.label}字号") },
+                        onClick = {
+                            onFontScale(option)
+                            fontMenu = false
+                        },
+                        trailingIcon = {
+                            if (option == fontScale) {
+                                Icon(Icons.Filled.Check, contentDescription = null)
+                            }
+                        }
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.weight(1f))
+        Text(
+            "${fontScale.label}字号",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
