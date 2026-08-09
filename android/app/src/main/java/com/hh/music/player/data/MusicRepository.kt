@@ -2,6 +2,7 @@ package com.hh.music.player.data
 
 import android.content.Context
 import com.hh.music.player.data.local.LocalStore
+import com.hh.music.player.data.offline.DownloadManager
 import com.hh.music.player.network.DirectNcmClient
 import com.hh.music.player.network.NcmParser
 import com.hh.music.player.network.HHMusicApi
@@ -10,6 +11,7 @@ import com.hh.music.player.network.RecommendPlaylistItem
 import com.hh.music.player.network.ToplistResponse
 import kotlinx.coroutines.launch
 import com.hh.music.player.playback.PlayerController
+import com.hh.music.player.playback.EqualizerController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.withContext
@@ -40,16 +42,18 @@ class MusicRepository(
     // Small in-memory LRU caches: lyrics are re-opened every time you re-visit the
     // player screen, and search results are re-fetched on every keystroke debounce.
     private val lyricCache = LruCache<Long, Lyric>(30)
-    private val searchCache = LruCache<String, List<Song>>(30)
+    private val searchCache = LruCache<SearchCacheKey, SearchPage>(30)
 
     // ---------------- direct (NetEase) implementations ----------------
 
-    suspend fun search(keyword: String, limit: Int = 30, offset: Int = 0): Result<List<Song>> =
+    suspend fun search(keyword: String, limit: Int = 30, offset: Int = 0): Result<SearchPage> =
         runCatching {
-            searchCache[keyword]?.let { return@runCatching it }
-            val songs = withContext(Dispatchers.IO) {
+            val key = SearchCacheKey(keyword, limit, offset)
+            searchCache[key]?.let { return@runCatching it }
+            val page = withContext(Dispatchers.IO) {
                 if (useBackend) {
-                    api.search(keyword, limit, offset).songs
+                    val resp = api.search(keyword, limit, offset)
+                    SearchPage(songs = resp.songs, total = resp.songCount)
                 } else {
                     val fields = mapOf(
                         "s" to keyword,
@@ -58,11 +62,11 @@ class MusicRepository(
                         "offset" to offset.toString()
                     )
                     val body = DirectNcmClient.apiPost("cloudsearch/pc", fields)
-                    NcmParser.searchSongs(JSONObject(body))
+                    NcmParser.searchPage(JSONObject(body))
                 }
             }
-            searchCache[keyword] = songs
-            songs
+            searchCache[key] = page
+            page
         }
 
     suspend fun songDetail(ids: List<Long>): Result<List<Song>> = runCatching {
@@ -240,14 +244,33 @@ class MusicRepository(
     }
 }
 
+/** Cache key for search results: paging parameters are part of the identity. */
+data class SearchCacheKey(
+    val keyword: String,
+    val limit: Int,
+    val offset: Int
+)
+
 /** Manual dependency injection container, created in HHMusicApp. */
 class AppContainer(context: Context) {
     val localStore: LocalStore = LocalStore(context.applicationContext)
     val repository: MusicRepository = MusicRepository(local = localStore)
-    val playerController: PlayerController = PlayerController(context.applicationContext, repository, localStore)
+    val downloadManager: DownloadManager = DownloadManager(context.applicationContext, repository, localStore)
+    val equalizerController: EqualizerController = EqualizerController(localStore)
+    val playerController: PlayerController =
+        PlayerController(context.applicationContext, repository, localStore, downloadManager)
 
     // Keep the repository runtime flags in sync with persisted user settings.
     private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
+
+    companion object {
+        /**
+         * Process-wide handle so [PlaybackService] (a separate Android component)
+         * can reach the equalizer / download manager without a DI framework.
+         */
+        @Volatile
+        var instance: AppContainer? = null
+    }
 
     init {
         scope.launch { localStore.useBackend.collect { repository.useBackend = it } }

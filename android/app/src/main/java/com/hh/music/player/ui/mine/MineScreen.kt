@@ -15,10 +15,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
 import com.hh.music.player.data.SavedPlaylist
 import com.hh.music.player.data.local.LocalStore
 import com.hh.music.player.ui.LocalPlayerController
+import com.hh.music.player.ui.components.ArtworkImage
 import com.hh.music.player.ui.components.MiniPlayerBar
 import com.hh.music.player.ui.components.SongRow
 
@@ -135,13 +135,13 @@ private fun SavedPlaylistList(
                 modifier = Modifier.fillMaxWidth().clickable { onOpen(item.id) }.padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (item.coverUrl.isNotBlank()) {
-                    AsyncImage(
-                        model = item.coverUrl,
-                        contentDescription = null,
-                        modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp))
-                    )
-                }
+ArtworkImage(
+                    url = item.coverUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                )
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(item.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)

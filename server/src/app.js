@@ -1,0 +1,330 @@
+import express from "express";
+import cors from "cors";
+import { randomUUID } from "node:crypto";
+import {
+  searchSongs,
+  getSongDetail,
+  getSongUrl,
+  getLyric,
+  getPlaylistDetail,
+  getToplists,
+  getRecommendSongs,
+  getRecommendPlaylists,
+  getArtistSongs,
+  getNewSongs,
+  likeSong,
+  pingUpstream,
+} from "./netease.js";
+
+/** Hard cap for every page-size query param. */
+export const MAX_LIMIT = 100;
+
+/** Wrap an async route handler so rejections reach the global error middleware. */
+const asyncHandler = (fn) => (req, res, next) =>
+  Promise.resolve(fn(req, res, next)).catch(next);
+
+/**
+ * Build the Express app. `deps` lets tests stub the NetEase upstream functions;
+ * anything not provided falls back to the real implementation.
+ */
+export function createApp(deps = {}) {
+  const api = {
+    searchSongs,
+    getSongDetail,
+    getSongUrl,
+    getLyric,
+    getPlaylistDetail,
+    getToplists,
+    getRecommendSongs,
+    getRecommendPlaylists,
+    getArtistSongs,
+    getNewSongs,
+    likeSong,
+    ...deps,
+  };
+
+  const app = express();
+
+  // Per-request id (echoed in every error body) + basic access log with timing.
+  const logRequests = process.env.LOG_REQUESTS !== "0";
+  app.use((req, res, next) => {
+    req.requestId = randomUUID();
+    const start = Date.now();
+    res.on("finish", () => {
+      if (logRequests) {
+        const ms = Date.now() - start;
+        const status = res.statusCode;
+        const marker = status >= 500 ? "ERR " : status >= 400 ? "WARN" : "OK  ";
+        console.log(`${new Date().toISOString()} ${marker} ${req.method} ${req.originalUrl} -> ${status} (${ms}ms) id=${req.requestId}`);
+      }
+    });
+    next();
+  });
+
+  // CORS: native clients (Android OkHttp) send no Origin header and are always
+  // allowed. Any Origin not whitelisted via ALLOWED_ORIGINS (comma-separated)
+  // is hard-rejected with a JSON 403 — browsers can't proxy us by default.
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && !allowedOrigins.includes(origin)) {
+      return res.status(403).json({ code: 403, msg: "origin not allowed", requestId: req.requestId });
+    }
+    next();
+  });
+  app.use(cors({ origin: allowedOrigins.length ? allowedOrigins : false }));
+  app.use(express.json({ limit: "100kb" }));
+
+  // Upstream timeout: respond with a stable JSON error instead of hanging.
+  const timeoutMs = Math.max(1, Number(process.env.REQUEST_TIMEOUT_MS ?? 15000));
+  app.use((req, res, next) => {
+    res.setTimeout(timeoutMs, () => {
+      res.status(504).json({ code: 504, msg: "upstream timeout" });
+    });
+    next();
+  });
+
+  function sendResult(res, result) {
+    if (!result || typeof result !== "object") {
+      return res.status(502).json({ code: 502, msg: "upstream error" });
+    }
+    const code = result.status && result.status >= 400 ? result.status : 200;
+    return res.status(code).json(result.data ?? result);
+  }
+
+  function toInt(v, def = 0) {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) ? n : def;
+  }
+
+  const limitParam = (v, def) => Math.min(Math.max(toInt(v, def), 1), MAX_LIMIT);
+
+  function normalizeSongNetease(s) {
+    const al = s.al ?? s.album ?? {};
+    const ar = s.ar ?? s.artists ?? [];
+    return {
+      id: s.id,
+      name: s.name,
+      artists: ar.map((a) => ({ id: a.id, name: a.name })),
+      album: { id: al.id, name: al.name, picUrl: al.picUrl },
+      duration: s.dt ?? s.duration ?? 0,
+      fee: s.fee ?? 0,
+    };
+  }
+
+  function normalizeSongsFrom(list = []) {
+    return list.map(normalizeSongNetease);
+  }
+
+  app.get(
+    "/api/search",
+    asyncHandler(async (req, res) => {
+      const keyword = (req.query.s ?? req.query.keyword ?? "").toString().trim();
+      if (!keyword) return res.status(400).json({ code: 400, msg: "missing keyword" });
+      const limit = limitParam(req.query.limit, 30);
+      const offset = Math.max(0, toInt(req.query.offset, 0));
+      const r = await api.searchSongs(keyword, limit, offset);
+      sendResult(res, {
+        status: 200,
+        data: {
+          code: 200,
+          songCount: r.data?.result?.songCount ?? 0,
+          songs: normalizeSongsFrom(r.data?.result?.songs),
+        },
+      });
+    })
+  );
+
+  app.get(
+    "/api/song/detail",
+    asyncHandler(async (req, res) => {
+      const ids = (req.query.ids ?? "").toString();
+      if (!ids) return res.status(400).json({ code: 400, msg: "missing ids" });
+      const r = await api.getSongDetail(ids.split(",").map((x) => toInt(x)));
+      sendResult(res, { status: 200, data: { code: 200, songs: normalizeSongsFrom(r.data?.songs) } });
+    })
+  );
+
+  app.get(
+    "/api/song/url",
+    asyncHandler(async (req, res) => {
+      const id = toInt(req.query.id, 0);
+      if (!id) return res.status(400).json({ code: 400, msg: "missing id" });
+      const level = (req.query.level ?? "exhigh").toString();
+      const r = await api.getSongUrl(id, level);
+      const d = (r.data?.data ?? [])[0] ?? {};
+      sendResult(res, {
+        status: 200,
+        data: {
+          code: 200,
+          id: d.id,
+          url: d.url ?? null,
+          br: d.br,
+          size: d.size,
+          type: d.type,
+          md5: d.md5,
+          // If url is null the track is usually copyrighted/VIP-only on NetEase.
+          freeTrialInfo: d.freeTrialInfo ?? null,
+        },
+      });
+    })
+  );
+
+  app.get(
+    "/api/lyric",
+    asyncHandler(async (req, res) => {
+      const id = toInt(req.query.id, 0);
+      if (!id) return res.status(400).json({ code: 400, msg: "missing id" });
+      const r = await api.getLyric(id);
+      const lyc = r.data ?? {};
+      sendResult(res, {
+        status: 200,
+        data: {
+          code: 200,
+          lrc: lyc.lrc?.lyric ?? "",
+          tlyric: lyc.tlyric?.lyric ?? "",
+          romalrc: lyc.romalrc?.lyric ?? "",
+          yrc: lyc.yrc?.lyric ?? "",
+        },
+      });
+    })
+  );
+
+  app.get(
+    "/api/playlist/detail",
+    asyncHandler(async (req, res) => {
+      const id = toInt(req.query.id, 0);
+      if (!id) return res.status(400).json({ code: 400, msg: "missing id" });
+      const r = await api.getPlaylistDetail(id);
+      const pl = r.data?.playlist ?? {};
+      sendResult(res, {
+        status: 200,
+        data: {
+          code: 200,
+          id: pl.id,
+          name: pl.name,
+          coverImgUrl: pl.coverImgUrl,
+          creator: { id: pl.creator?.id, nickname: pl.creator?.nickname },
+          tracks: normalizeSongsFrom(pl.tracks),
+        },
+      });
+    })
+  );
+
+  app.get(
+    "/api/toplist",
+    asyncHandler(async (_req, res) => {
+      const r = await api.getToplists();
+      const list = (r.data?.list ?? []).map((t) => ({
+        id: t.id,
+        name: t.name,
+        coverImgUrl: t.coverImgUrl,
+        description: t.description,
+        updateFrequency: t.updateFrequency,
+      }));
+      sendResult(res, { status: 200, data: { code: 200, list } });
+    })
+  );
+
+  app.post(
+    "/api/song/like",
+    asyncHandler(async (req, res) => {
+      const id = toInt(req.body?.id, 0);
+      if (!id) return res.status(400).json({ code: 400, msg: "missing id" });
+      const like = req.body?.like ?? true;
+      const r = await api.likeSong(id, like);
+      sendResult(res, { status: 200, data: { code: 200, id, like, raw: r.data?.code } });
+    })
+  );
+
+  app.get(
+    "/api/recommend/songs",
+    asyncHandler(async (req, res) => {
+      const limit = limitParam(req.query.limit, 30);
+      const r = await api.getRecommendSongs(limit);
+      const songs = normalizeSongsFrom(r.data?.data?.dailySongs ?? r.data?.recommend);
+      sendResult(res, { status: 200, data: { code: 200, songs } });
+    })
+  );
+
+  app.get(
+    "/api/recommend/playlists",
+    asyncHandler(async (req, res) => {
+      const limit = limitParam(req.query.limit, 12);
+      const r = await api.getRecommendPlaylists(limit);
+      const list = (r.data?.result ?? []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        picUrl: p.picUrl,
+        playcount: p.playcount ?? p.playCount,
+        creator: { nickname: (p.creator ?? {}).nickname },
+      }));
+      sendResult(res, { status: 200, data: { code: 200, list } });
+    })
+  );
+
+  app.get(
+    "/api/artist/songs",
+    asyncHandler(async (req, res) => {
+      const id = toInt(req.query.id, 0);
+      if (!id) return res.status(400).json({ code: 400, msg: "missing id" });
+      const limit = limitParam(req.query.limit, 50);
+      const offset = Math.max(0, toInt(req.query.offset, 0));
+      const order = (req.query.order ?? "hot").toString();
+      const r = await api.getArtistSongs(id, limit, offset, order);
+      sendResult(res, {
+        status: 200,
+        data: {
+          code: 200,
+          total: r.data?.total ?? 0,
+          songs: normalizeSongsFrom(r.data?.songs),
+        },
+      });
+    })
+  );
+
+  app.get(
+    "/api/new/song",
+    asyncHandler(async (req, res) => {
+      const limit = limitParam(req.query.limit, 30);
+      const r = await api.getNewSongs(limit);
+      const items = normalizeSongsFrom(
+        (r.data?.result ?? r.data?.data ?? []).map((it) => it.song ?? it)
+      );
+      sendResult(res, { status: 200, data: { code: 200, songs: items } });
+    })
+  );
+
+  app.get("/api/health", async (_req, res) => {
+    // Upstream reachability is checked with a short timeout; the endpoint stays
+    // 200 even when NetEase is unreachable so orchestrators can probe liveness,
+    // while `upstream` tells actual service health.
+    const upstreamOk = await pingUpstream().catch(() => false);
+    res.json({
+      code: 200,
+      ok: true,
+      upstream: upstreamOk ? "ok" : "down",
+      ts: Date.now(),
+    });
+  });
+
+  // Unknown routes -> JSON, never the HTML fallback.
+  app.use((req, res) =>
+    res.status(404).json({ code: 404, msg: "not found", requestId: req.requestId })
+  );
+
+  // Global error handler: always JSON, never a default Express HTML page.
+  // eslint-disable-next-line no-unused-vars
+  app.use((err, req, res, next) => {
+    console.error(`[HHMusic server error] id=${req.requestId}`, err?.message ?? err);
+    if (res.headersSent) {
+      return next(err);
+    }
+    res.status(500).json({ code: 500, msg: "internal error", requestId: req.requestId });
+  });
+
+  return app;
+}

@@ -6,6 +6,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -21,6 +22,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.hh.music.player.data.MusicRepository
 import com.hh.music.player.ui.LocalPlayerController
 import com.hh.music.player.ui.LocalStoreProvider
+import com.hh.music.player.ui.components.EmptyState
+import com.hh.music.player.ui.components.LoadingState
 import com.hh.music.player.ui.components.MiniPlayerBar
 import com.hh.music.player.ui.components.SongRow
 import kotlinx.coroutines.launch
@@ -104,11 +107,10 @@ fun SearchScreen(
         ) { padding ->
             Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                 when {
-                    state.loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                    state.error != null -> Text(
-                        "出错啦: ${state.error}",
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.align(Alignment.Center).padding(24.dp)
+                    state.loading -> LoadingState()
+                    state.error != null -> EmptyState(
+                        hint = "出错啦：${state.error}",
+                        icon = Icons.Filled.Search
                     )
                     state.query.isBlank() -> SearchSuggestionsSection(
                         history = history,
@@ -119,26 +121,17 @@ fun SearchScreen(
                         },
                         onClear = { actualVm.clearHistory() }
                     )
-                    state.results.isEmpty() -> Text(
-                        "没有找到结果",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.align(Alignment.Center)
+                    state.results.isEmpty() -> EmptyState(
+                        hint = "没有找到结果",
+                        icon = Icons.Filled.Search
                     )
-                    else -> {
-                        LazyColumn(modifier = Modifier.fillMaxSize()) {
-                            itemsIndexed(state.results) { index, song ->
-                                SongRow(
-                                    song = song,
-                                    index = index,
-                                    isActive = song.id == currentSong?.id,
-                                    isPlaying = song.id == currentSong?.id && isPlaying,
-                                    onClick = { playFrom(index) }
-                                )
-                                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                            }
-                            item { Spacer(Modifier.height(72.dp)) }
-                        }
-                    }
+                    else -> SearchResultsList(
+                        state = state,
+                        currentSongId = currentSong?.id,
+                        isPlaying = isPlaying,
+                        onPlay = ::playFrom,
+                        onLoadMore = actualVm::loadMore
+                    )
                 }
                 MiniPlayerBar(
                     player = player,
@@ -155,9 +148,7 @@ fun SearchScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             when {
-                state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+                state.loading -> LoadingState()
                 state.query.isBlank() -> SearchSuggestionsSection(
                     history = history,
                     hotSearches = HOT_SEARCHES,
@@ -167,30 +158,74 @@ fun SearchScreen(
                     },
                     onClear = { actualVm.clearHistory() }
                 )
-                state.results.isEmpty() && state.error == null -> Box(
-                    Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                state.results.isEmpty() && state.error == null -> EmptyState(
+                    hint = "没有找到结果",
+                    icon = Icons.Filled.Search
+                )
+                state.error != null -> EmptyState(
+                    hint = "出错啦：${state.error}",
+                    icon = Icons.Filled.Search
+                )
+                else -> SearchResultsList(
+                    state = state,
+                    currentSongId = currentSong?.id,
+                    isPlaying = isPlaying,
+                    onPlay = ::playFrom,
+                    onLoadMore = actualVm::loadMore
+                )
+            }
+        }
+    }
+}
+
+/** Search result list with an auto-triggered "load more" footer while pages remain. */
+@Composable
+private fun SearchResultsList(
+    state: SearchState,
+    currentSongId: Long?,
+    isPlaying: Boolean,
+    onPlay: (Int) -> Unit,
+    onLoadMore: () -> Unit
+) {
+    val listState = rememberLazyListState()
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            state.hasMore && !state.loadingMore && lastVisible >= state.results.size - 4
+        }
+    }
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore && state.results.isNotEmpty()) onLoadMore()
+    }
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        itemsIndexed(state.results) { index, song ->
+            SongRow(
+                song = song,
+                index = index,
+                isActive = song.id == currentSongId,
+                isPlaying = song.id == currentSongId && isPlaying,
+                onClick = { onPlay(index) }
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+        }
+        if (state.hasMore) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    Text("没有找到结果", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                state.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("出错啦: ${state.error}", color = MaterialTheme.colorScheme.error)
-                }
-                else -> LazyColumn(Modifier.fillMaxSize()) {
-                    itemsIndexed(state.results) { index, song ->
-                        SongRow(
-                            song = song,
-                            index = index,
-                            isActive = song.id == currentSong?.id,
-                            isPlaying = song.id == currentSong?.id && isPlaying,
-                            onClick = { playFrom(index) }
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                    if (state.loadingMore) {
+                        CircularProgressIndicator(modifier = Modifier.size(26.dp))
+                    } else {
+                        TextButton(onClick = onLoadMore) { Text("加载更多") }
                     }
-                    item { Spacer(Modifier.height(24.dp)) }
                 }
             }
         }
+        item { Spacer(Modifier.height(72.dp)) }
     }
 }
 

@@ -2,6 +2,12 @@ import { weapi } from "./crypto.js";
 
 const NETEASE_BASE = "https://music.163.com/weapi";
 
+// Configurable upstream behaviour via env (used by tests too):
+//   UPSTREAM_TIMEOUT_MS — per-attempt timeout (default 12s)
+//   UPSTREAM_RETRIES    — retries for transient network/5xx failures (default 2)
+const TIMEOUT_MS = Math.max(500, Number(process.env.UPSTREAM_TIMEOUT_MS ?? 12_000));
+const MAX_RETRIES = Math.min(5, Math.max(0, Number(process.env.UPSTREAM_RETRIES ?? 2)));
+
 const ENDPOINTS = {
   search: "/search/get",
   songDetail: "/v3/song/detail",
@@ -18,7 +24,17 @@ const ENDPOINTS = {
   artistDetail: "/artist/desc",
 };
 
-async function neteaseRequest(type, payload, extraHeaders = {}) {
+/** Network-ish failures worth retrying (fetch throws, timeouts, 5xx, 429). */
+function isRetryable(result) {
+  if (result === "throw") return true;
+  if (!result || typeof result !== "object") return false;
+  return (
+    result.status >= 500 ||
+    (result.data && (result.data.code === 429 || result.data.code >= 500 && result.data.code < 600))
+  );
+}
+
+async function neteaseRequest(type, payload, extraHeaders = {}, { retries = MAX_RETRIES, retry = true } = {}) {
   const path = ENDPOINTS[type] ?? type;
   const url = NETEASE_BASE + path;
   const body = weapi(payload);
@@ -32,20 +48,46 @@ async function neteaseRequest(type, payload, extraHeaders = {}) {
     ...extraHeaders,
   };
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers,
-    body: new URLSearchParams(body).toString(),
-  });
+  let lastErr;
+  for (let attempt = 0; attempt <= (retry ? retries : 0); attempt++) {
+    let status, text;
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers,
+        body: new URLSearchParams(body).toString(),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      status = res.status;
+      text = await res.text();
+    } catch (err) {
+      if (!retry || attempt >= retries) {
+        return {
+          status: 0,
+          data: {
+            code: -1,
+            msg: `upstream unreachable: ${err.name ?? "error"}${err.message ? `: ${err.message}` : ""}`,
+          },
+        };
+      }
+      continue; // transient network failure / timeout -> retry with backoff
+    }
 
-  const text = await res.text();
-  let json;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    json = { code: res.status, raw: text };
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = { code: status, raw: text };
+    }
+    const result = { status, data: json };
+    // Strictly non-retryable upstream verdicts (4xx with a real business code)
+    // short-circuit; transient 5xx/429 retry with short backoff.
+    if (retry && attempt < retries && isRetryable(result)) {
+      await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+      continue;
+    }
+    return result;
   }
-  return { status: res.status, data: json };
 }
 
 export async function searchSongs(keyword, limit = 30, offset = 0) {
@@ -79,7 +121,8 @@ export async function getToplists() {
 }
 
 export async function likeSong(id, like = true) {
-  return neteaseRequest("songLike", { trackId: id, like }, { Cookie: "os=android" });
+  // Mutating call: never retry, or we could double-like/unlike.
+  return neteaseRequest("songLike", { trackId: id, like }, { Cookie: "os=android" }, { retry: false });
 }
 
 /* ----- New: recommendations & artist songs ----- */
@@ -104,6 +147,24 @@ export async function getArtistSongs(id, limit = 50, offset = 0, order = "hot") 
 
 export async function getNewSongs(limit = 30) {
   return neteaseRequest("newSong", { type: 0, areaId: 0, limit });
+}
+
+/**
+ * Cheap liveness probe against NetEase, used by GET /api/health. Does NOT
+ * depend on the weapi signing machinery — a plain GET is enough to tell
+ * whether we have network reachability + a working DNS/TLS path.
+ */
+export async function pingUpstream() {
+  try {
+    const res = await fetch("https://music.163.com/api/linux/forward/echo", {
+      method: "GET",
+      headers: { "User-Agent": "HHMusic/1.4" },
+      signal: AbortSignal.timeout(5000),
+    });
+    return res.status >= 200 && res.status < 500; // 404/403 still means "reachable"
+  } catch {
+    return false;
+  }
 }
 
 export { neteaseRequest };

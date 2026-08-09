@@ -18,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.hh.music.player.playback.PlayerController
 
 /** Compact now-playing bar that floats above the content on list screens. */
@@ -54,15 +53,13 @@ fun MiniPlayerBar(
                         .padding(start = 8.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (current.coverUrl.startsWith("http")) {
-                        AsyncImage(
-                            model = current.coverUrl,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(46.dp)
-                                .clip(MaterialTheme.shapes.medium)
-                        )
-                    }
+                    ArtworkImage(
+                        url = current.coverUrl,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(MaterialTheme.shapes.medium)
+                    )
                     Spacer(Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(

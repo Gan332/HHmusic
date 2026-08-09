@@ -10,5 +10,6 @@ class HHMusicApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        AppContainer.instance = container
     }
 }

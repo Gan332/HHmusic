@@ -66,6 +66,22 @@ data class Lyric(
     val yrc: String = ""
 )
 
+/** Persisted playback queue so the app can restore the last playing state. */
+@Serializable
+data class SavedQueue(
+    val songs: List<Song> = emptyList(),
+    val index: Int = -1,
+    /** Playback position of [songs][[index]] — resume where the user left off. */
+    val positionMs: Long = 0L
+)
+
+/** One page of search results (songs + total count for pagination). */
+@Serializable
+data class SearchPage(
+    val songs: List<Song> = emptyList(),
+    val total: Int = 0
+)
+
 @Serializable
 data class SearchResponse(
     val code: Int = 0,

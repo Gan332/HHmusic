@@ -24,12 +24,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import com.hh.music.player.data.EqualizerPresets
 import com.hh.music.player.data.MusicRepository
+import com.hh.music.player.data.Song
 import com.hh.music.player.playback.PlayMode
+import com.hh.music.player.playback.PlaybackEngine
 import com.hh.music.player.ui.LocalPlayerController
 import com.hh.music.player.ui.LocalStoreProvider
+import com.hh.music.player.ui.LocalEqualizerController
 import com.hh.music.player.ui.ProgressStyle
+import com.hh.music.player.ui.components.ArtworkImage
+import com.hh.music.player.ui.components.SongActionsSheet
 import com.hh.music.player.ui.components.WaveformSlider
 import com.hh.music.player.ui.components.rememberWaveformAmplitudes
 import com.hh.music.player.ui.components.SongRow
@@ -46,11 +51,15 @@ fun PlayerScreen(
 ) {
     val player = LocalPlayerController.current
     val store = LocalStoreProvider.current
+    val equalizer = LocalEqualizerController.current
     val song by player.currentSong.collectAsState()
     val isPlaying by player.isPlaying.collectAsState()
     val queue by player.queue.collectAsState()
+    val queueStats = remember(queue) { PlaybackEngine.queueStats(queue) }
     val playMode by player.playMode.collectAsState()
     val lyricState by vm.state.collectAsState()
+    val playbackError by player.playbackError.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val progressStyleKey by store.progressStyle.collectAsState(initial = ProgressStyle.SLIDER.key)
     val progressStyle = ProgressStyle.fromKey(progressStyleKey)
@@ -59,8 +68,33 @@ fun PlayerScreen(
     val isFav = song?.let { s -> favorites.any { it.id == s.id } } ?: false
 
     var showQueue by remember { mutableStateOf(false) }
+    var queueMenuIndex by remember { mutableStateOf<Int?>(null) }
+
+    val resolving by player.resolvingCurrent.collectAsState()
+    val speed by player.speed.collectAsState()
+    val sleepRemaining by player.sleepTimerRemaining.collectAsState()
 
     LaunchedEffect(song?.id) { song?.id?.let { vm.loadLyric(it) } }
+
+    var speedMenu by remember { mutableStateOf(false) }
+    var timerMenu by remember { mutableStateOf(false) }
+    var eqOpen by remember { mutableStateOf(false) }
+    var actionsSong by remember { mutableStateOf<Song?>(null) }
+
+    // Present playback failures (VIP / copyright / network) once per new error.
+    // The action offered depends on the failure: retryable → 重试, otherwise → 下一首.
+    LaunchedEffect(playbackError?.songId, playbackError?.retryable) {
+        val err = playbackError ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = err.message,
+            actionLabel = if (err.retryable) "重试" else "下一首",
+            duration = SnackbarDuration.Short
+        )
+        if (result == SnackbarResult.ActionPerformed) {
+            if (err.retryable) player.retryCurrentSong() else player.playNext()
+        }
+        player.clearPlaybackError()
+    }
 
     val playModeIcon = when (playMode) {
         PlayMode.SEQUENCE -> Icons.Filled.Repeat
@@ -77,8 +111,8 @@ fun PlayerScreen(
         // SPICaMusic style: blurred cover as the page background with a scrim.
         val coverUrl = song?.coverUrl.orEmpty()
         if (coverUrl.startsWith("http")) {
-            AsyncImage(
-                model = coverUrl,
+            ArtworkImage(
+                url = coverUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -114,6 +148,101 @@ fun PlayerScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                // v1.5 倍速：chip 弹出档位选择，全局生效并持久化
+                Box {
+                    TextButton(onClick = { speedMenu = true }) {
+                        Text(
+                            speedLabel(speed),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    DropdownMenu(expanded = speedMenu, onDismissRequest = { speedMenu = false }) {
+                        player.speedOptions().forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(speedLabel(option)) },
+                                onClick = {
+                                    player.setSpeed(option)
+                                    speedMenu = false
+                                },
+                                trailingIcon = {
+                                    if (option == speed) {
+                                        Icon(Icons.Filled.Check, contentDescription = null)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+                // v1.5 定时关闭：激活时显示剩余时间
+                if (sleepRemaining != null) {
+                    Box(
+                        Modifier
+                            .clip(MaterialTheme.shapes.small)
+                            .background(MaterialTheme.colorScheme.primaryContainer)
+                            .padding(horizontal = 6.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            formatSleepRemaining(sleepRemaining),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+                Box {
+                    TooltipBox(
+                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                        tooltip = { PlainTooltip { Text("定时关闭") } },
+                        state = rememberTooltipState()
+                    ) {
+                        IconButton(onClick = { timerMenu = true }) {
+                            Icon(
+                                Icons.Filled.Timer,
+                                contentDescription = "定时关闭",
+                                tint = if (sleepRemaining != null) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    DropdownMenu(expanded = timerMenu, onDismissRequest = { timerMenu = false }) {
+                        listOf(15, 30, 45, 60, 90).forEach { minutes ->
+                            DropdownMenuItem(
+                                text = { Text("$minutes 分钟") },
+                                onClick = {
+                                    player.startSleepTimer(minutes)
+                                    timerMenu = false
+                                }
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("当前曲目结束") },
+                            onClick = {
+                                player.startSleepTimerToEndOfTrack()
+                                timerMenu = false
+                            }
+                        )
+                        if (sleepRemaining != null) {
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("取消定时") },
+                                onClick = {
+                                    player.cancelSleepTimer()
+                                    timerMenu = false
+                                }
+                            )
+                        }
+                    }
+                }
+                // v1.5 音效：均衡器预置面板
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                    tooltip = { PlainTooltip { Text("音效") } },
+                    state = rememberTooltipState()
+                ) {
+                    IconButton(onClick = { eqOpen = true }) {
+                        Icon(Icons.Filled.Equalizer, contentDescription = "音效")
+                    }
+                }
                 TooltipBox(
                     positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                     tooltip = { PlainTooltip { Text(if (isFav) "取消收藏" else "收藏") } },
@@ -130,15 +259,6 @@ fun PlayerScreen(
                 }
                 TooltipBox(
                     positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                    tooltip = { PlainTooltip { Text("设置") } },
-                    state = rememberTooltipState()
-                ) {
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Filled.Settings, contentDescription = "设置")
-                    }
-                }
-                TooltipBox(
-                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                     tooltip = { PlainTooltip { Text("播放队列") } },
                     state = rememberTooltipState()
                 ) {
@@ -151,32 +271,22 @@ fun PlayerScreen(
             Spacer(Modifier.height(12.dp))
 
             // Cover (stable; recomposes on song change only)
-            if (song != null && song!!.coverUrl.startsWith("http")) {
-                AsyncImage(
-                    model = song!!.coverUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
+            if (song != null) {
+                ArtworkImage(
+                    url = song.coverUrl,
+                    contentDescription = song.name,
                     modifier = Modifier
                         .fillMaxWidth(0.72f)
                         .aspectRatio(1f)
                         .clip(MaterialTheme.shapes.extraLarge)
                         .align(Alignment.CenterHorizontally)
                 )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.72f)
-                        .aspectRatio(1f)
-                        .clip(MaterialTheme.shapes.extraLarge)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                        .align(Alignment.CenterHorizontally),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Filled.MusicNote,
-                        contentDescription = null,
-                        modifier = Modifier.size(80.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                // 播放地址解析中 — subtle inline progress until the URL is hot-swapped in.
+                if (resolving) {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth(0.72f)
+                            .align(Alignment.CenterHorizontally)
                     )
                 }
             }
@@ -187,6 +297,7 @@ fun PlayerScreen(
             LyricsSection(
                 lyricState = lyricState,
                 positionFlow = player.positionMs,
+                onRetryLyric = { song?.id?.let { vm.loadLyric(it) } },
                 modifier = Modifier.weight(1f).fillMaxWidth()
             )
 
@@ -245,28 +356,259 @@ fun PlayerScreen(
                 }
             }
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 
     // M3E 底部弹层播放队列
     if (showQueue) {
-        ModalBottomSheet(onDismissRequest = { showQueue = false }) {
+        ModalBottomSheet(onDismissRequest = {
+            showQueue = false
+            queueMenuIndex = null
+        }) {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                Text("播放队列", style = MaterialTheme.typography.titleLarge)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "播放队列",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(enabled = queue.isNotEmpty(), onClick = { player.clearQueue() }) {
+                        Text("清空")
+                    }
+                }
+                if (queue.isNotEmpty()) {
+                    Text(
+                        "${queueStats.count} 首 · 总时长 ${formatQueueDuration(queueStats.durationMs)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Spacer(Modifier.height(8.dp))
+                if (queue.isEmpty()) {
+                    Text(
+                        "队列为空 — 从列表中选择歌曲开始播放",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                        textAlign = TextAlign.Center
+                    )
+                }
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)
                 ) {
                     itemsIndexed(queue) { index, s ->
-                        SongRow(
-                            song = s, index = index,
-                            isActive = s.id == song?.id,
-                            isPlaying = s.id == song?.id && isPlaying,
-                            onClick = { player.playAt(index) }
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            SongRow(
+                                song = s, index = index,
+                                isActive = s.id == song?.id,
+                                isPlaying = s.id == song?.id && isPlaying,
+                                onClick = {
+                                    player.playAt(index)
+                                    showQueue = false
+                                },
+                                onLongClick = { actionsSong = s },
+                                modifier = Modifier.weight(1f)
+                            )
+                            Column {
+                                if (s.id == song?.id) {
+                                    Text(
+                                        if (isPlaying) "正在播放" else "当前",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                IconButton(
+                                    enabled = index > 0,
+                                    onClick = { player.moveQueueItem(index, index - 1) }
+                                ) { Icon(Icons.Filled.ArrowDropUp, contentDescription = "上移") }
+                                IconButton(
+                                    enabled = index < queue.lastIndex,
+                                    onClick = { player.moveQueueItem(index, index + 1) }
+                                ) { Icon(Icons.Filled.ArrowDropDown, contentDescription = "下移") }
+                            }
+                            Box {
+                                IconButton(onClick = { queueMenuIndex = index }) {
+                                    Icon(Icons.Filled.MoreVert, contentDescription = "更多操作")
+                                }
+                                DropdownMenu(
+                                    expanded = queueMenuIndex == index,
+                                    onDismissRequest = { queueMenuIndex = null }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("移到顶部") },
+                                        enabled = index > 0,
+                                        onClick = {
+                                            player.moveToQueueTop(index)
+                                            queueMenuIndex = null
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("移到底部") },
+                                        enabled = index < queue.lastIndex,
+                                        onClick = {
+                                            player.moveToQueueBottom(index)
+                                            queueMenuIndex = null
+                                        }
+                                    )
+                                    HorizontalDivider()
+                                    DropdownMenuItem(
+                                        text = { Text("从队列移除") },
+                                        onClick = {
+                                            player.removeFromQueue(index)
+                                            queueMenuIndex = null
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
                 Spacer(Modifier.height(24.dp))
             }
+        }
+    }
+
+    // v1.5 歌曲操作弹层（播放/下一首/入队/收藏/下载）
+    SongActionsSheet(song = actionsSong, onDismiss = { actionsSong = null })
+
+    // v1.5 均衡器面板
+    if (eqOpen) {
+        EqualizerSheet(
+            store = store,
+            equalizer = equalizer,
+            onDismiss = { eqOpen = false }
+        )
+    }
+}
+
+/** 顶栏速度 chip 文案：1.0x / 0.75x / 2.0x … */
+private fun speedLabel(speed: Float): String {
+    val s = speed.coerceIn(0.5f, 2f)
+    return if (s % 1f == 0f) "%.0fx".format(s) else "%.2fx".format(s).trimEnd('0').trimEnd('.') + "x"
+}
+
+/** 队列总时长文案：HH:MM:SS。 */
+private fun formatQueueDuration(ms: Long): String {
+    val totalSec = (ms / 1000).coerceAtLeast(0L)
+    val h = totalSec / 3600
+    val m = (totalSec % 3600) / 60
+    val s = totalSec % 60
+    return "%02d:%02d:%02d".format(h, m, s)
+}
+
+/** 定时关闭剩余时间 mm:ss（或 hh:mm:ss）。 */
+private fun formatSleepRemaining(ms: Long?): String {
+    if (ms == null) return ""
+    val totalSec = (ms / 1000).coerceAtLeast(0L)
+    val h = totalSec / 3600
+    val m = (totalSec % 3600) / 60
+    val s = totalSec % 60
+    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
+}
+
+/**
+ * 均衡器面板：开关 + 预置 chips + 自定义频段滑杆。
+ * 读 [LocalEqualizerController] 的可用性与频段；写入 [LocalStore] 即时应用到播放会话。
+ */
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun EqualizerSheet(
+    store: com.hh.music.player.data.local.LocalStore,
+    equalizer: com.hh.music.player.playback.EqualizerController,
+    onDismiss: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    val eqEnabled by store.equalizerEnabled.collectAsState(initial = false)
+    val presetKey by store.equalizerPreset.collectAsState(initial = EqualizerPresets.DEFAULT)
+    val bandsString by store.equalizerBands.collectAsState(initial = "")
+    val available by equalizer.isAvailable.collectAsState()
+    val bandFreqs by equalizer.bandFreqs.collectAsState()
+
+    val customBands = remember(bandsString) { EqualizerPresets.parseBands(bandsString) }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("均衡器", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                Text(
+                    if (available) "已连接音频会话" else "当前设备不支持",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (available) MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.error
+                )
+                Switch(
+                    checked = eqEnabled && available,
+                    onCheckedChange = { scope.launch { store.setEqualizerEnabled(it && available) } },
+                    enabled = available
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                EqualizerPresets.PRESETS.forEach { key ->
+                    FilterChip(
+                        selected = presetKey == key,
+                        enabled = available && eqEnabled,
+                        onClick = {
+                            scope.launch {
+                                store.setEqualizerPreset(key)
+                                if (key == EqualizerPresets.CUSTOM && customBands.isEmpty()) {
+                                    // 用当前设备频段数初始化一条平直曲线
+                                    val count = equalizer.bandCount.value.takeIf { it > 0 } ?: 10
+                                    store.setEqualizerBands(EqualizerPresets.serializeBands(List(count) { 0 }))
+                                }
+                            }
+                        },
+                        label = { Text(EqualizerPresets.displayName(key)) }
+                    )
+                }
+            }
+            if (available && eqEnabled && presetKey == EqualizerPresets.CUSTOM && bandFreqs.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    "自定义频段（毫贝）",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+                bandFreqs.forEachIndexed { i, freqHz ->
+                    val value = customBands.getOrElse(i) { 0 }
+                    val freqLabel = if (freqHz >= 1000) "${freqHz / 1000}k" else "$freqHz"
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            freqLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.width(44.dp)
+                        )
+                        Slider(
+                            value = value.toFloat().coerceIn(-1500f, 1500f),
+                            onValueChange = { newValue ->
+                                val updated = customBands.toMutableList()
+                                while (updated.size <= i) updated.add(0)
+                                updated[i] = newValue.toInt()
+                                scope.launch { store.setEqualizerBands(EqualizerPresets.serializeBands(updated)) }
+                            },
+                            valueRange = -1500f..1500f,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            "${value / 10} dB",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.width(48.dp),
+                            textAlign = TextAlign.End
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(24.dp))
         }
     }
 }
@@ -280,6 +622,7 @@ fun PlayerScreen(
 private fun LyricsSection(
     lyricState: LyricState,
     positionFlow: kotlinx.coroutines.flow.StateFlow<Long>,
+    onRetryLyric: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val lyricList = lyricState.lines
@@ -302,14 +645,8 @@ private fun LyricsSection(
     }
 
     Box(modifier) {
-        if (lyricList.isEmpty()) {
-            Text(
-                if (lyricState.loading) "歌词加载中..." else "暂无歌词",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.align(Alignment.Center)
-            )
-        } else {
-            LazyColumn(
+        when {
+            lyricList.isNotEmpty() -> LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(vertical = 32.dp)
@@ -336,6 +673,19 @@ private fun LyricsSection(
                     }
                 }
             }
+
+            lyricState.error -> TextButton(
+                onClick = onRetryLyric,
+                modifier = Modifier.align(Alignment.Center)
+            ) {
+                Text("歌词加载失败，点击重试")
+            }
+
+            else -> Text(
+                if (lyricState.loading) "歌词加载中..." else "暂无歌词",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.align(Alignment.Center)
+            )
         }
     }
 }

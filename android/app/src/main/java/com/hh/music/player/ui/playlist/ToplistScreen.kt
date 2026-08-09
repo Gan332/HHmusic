@@ -17,13 +17,12 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
 import com.hh.music.player.data.MusicRepository
 import com.hh.music.player.ui.LocalPlayerController
+import com.hh.music.player.ui.components.ArtworkImage
 import com.hh.music.player.ui.components.MiniPlayerBar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -117,14 +116,11 @@ private fun ToplistCarousel(
                 modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge)
             ) {
                 Box(Modifier.fillMaxWidth().aspectRatio(1f)) {
-                    if (!item.coverImgUrl.isNullOrBlank()) {
-                        AsyncImage(
-                            model = item.coverImgUrl,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
+                    ArtworkImage(
+                        url = item.coverImgUrl.orEmpty(),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize()
+                    )
                     FilledIconButton(
                         onClick = { onPlaylistClick(item.id) },
                         modifier = Modifier.align(Alignment.BottomEnd).padding(10.dp).size(40.dp)
@@ -187,13 +183,13 @@ private fun ToplistRow(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (!coverUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = coverUrl,
+            ArtworkImage(
+                    url = coverUrl.orEmpty(),
                     contentDescription = null,
-                    modifier = Modifier.size(52.dp).clip(MaterialTheme.shapes.medium)
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(MaterialTheme.shapes.medium)
                 )
-            }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(

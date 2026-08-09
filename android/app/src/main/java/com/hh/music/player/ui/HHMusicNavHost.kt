@@ -25,6 +25,8 @@ import androidx.navigation.compose.rememberNavController
 import android.net.Uri
 import com.hh.music.player.data.AppContainer
 import com.hh.music.player.data.local.LocalStore
+import com.hh.music.player.data.offline.DownloadManager
+import com.hh.music.player.playback.EqualizerController
 import com.hh.music.player.playback.PlayerController
 import com.hh.music.player.ui.library.LibraryScreen
 import com.hh.music.player.ui.settings.SettingsScreen
@@ -58,6 +60,16 @@ val LocalStoreProvider = compositionLocalOf<LocalStore> {
     error("LocalStore not provided")
 }
 
+/** Provides the offline download manager (cache list / progress / cap). */
+val LocalDownloadManager = compositionLocalOf<DownloadManager> {
+    error("DownloadManager not provided")
+}
+
+/** Provides the equalizer bridge (availability + band frequencies). */
+val LocalEqualizerController = compositionLocalOf<EqualizerController> {
+    error("EqualizerController not provided")
+}
+
 private data class TabItem(val route: String, val label: String, val icon: @Composable () -> Unit)
 
 @Composable
@@ -76,7 +88,9 @@ fun HHMusicNavHost(container: AppContainer) {
 
     CompositionLocalProvider(
         LocalPlayerController provides container.playerController,
-        LocalStoreProvider provides container.localStore
+        LocalStoreProvider provides container.localStore,
+        LocalDownloadManager provides container.downloadManager,
+        LocalEqualizerController provides container.equalizerController
     ) {
     NavigationSuiteScaffold(
         navigationSuiteItems = {
@@ -136,7 +150,14 @@ fun HHMusicNavHost(container: AppContainer) {
                 composable(Routes.LIBRARY) {
                     LibraryScreen(
                         onOpenPlaylist = { id -> navController.navigate(Routes.playlist(id)) },
-                        onOpenPlayer = { navController.navigate(Routes.PLAYER) }
+                        onOpenPlayer = { navController.navigate(Routes.PLAYER) },
+                        onOpenDiscover = {
+                            navController.navigate(Routes.DISCOVER) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
                     )
                 }
                 composable(Routes.SETTINGS) {

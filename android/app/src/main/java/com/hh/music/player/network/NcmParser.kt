@@ -2,6 +2,7 @@ package com.hh.music.player.network
 
 import com.hh.music.player.data.Album
 import com.hh.music.player.data.Artist
+import com.hh.music.player.data.SearchPage
 import com.hh.music.player.data.Song
 import com.hh.music.player.data.ToplistItem
 import org.json.JSONObject
@@ -43,10 +44,13 @@ object NcmParser {
         return out
     }
 
-    /** Search stores results under result.songs. */
-    fun searchSongs(root: JSONObject): List<Song> {
+/** Search stores results under result.songs (with result.songCount = total). */
+    fun searchPage(root: JSONObject): SearchPage {
         val result = root.optJSONObject("result") ?: root
-        return songList(result, "songs")
+        return SearchPage(
+            songs = songList(result, "songs"),
+            total = result.optInt("songCount", result.optInt("total", 0))
+        )
     }
 
     fun toplistItems(root: JSONObject): List<ToplistItem> {

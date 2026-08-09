@@ -9,6 +9,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.hh.music.player.MainActivity
+import com.hh.music.player.data.AppContainer
 
 /**
  * Foreground media playback service backed by ExoPlayer + a MediaSession.
@@ -16,11 +17,20 @@ import com.hh.music.player.MainActivity
  */
 class PlaybackService : MediaSessionService() {
 
+    companion object {
+        /**
+         * Fixed audio session id so the platform Equalizer (attached once, reused
+         * across track switches) never loses track of the player's session.
+         */
+        const val FIXED_AUDIO_SESSION_ID = 1001
+    }
+
     private var mediaSession: MediaSession? = null
 
     override fun onCreate() {
         super.onCreate()
         val player = ExoPlayer.Builder(this)
+            .setAudioSessionId(FIXED_AUDIO_SESSION_ID)
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
@@ -30,6 +40,9 @@ class PlaybackService : MediaSessionService() {
             )
             .setHandleAudioBecomingNoisy(true)
             .build()
+
+        // Mount the equalizer on the player's (fixed) audio session.
+        AppContainer.instance?.equalizerController?.attachTo(FIXED_AUDIO_SESSION_ID)
 
         val sessionActivityPendingIntent =
             PendingIntent.getActivity(
@@ -47,6 +60,7 @@ class PlaybackService : MediaSessionService() {
         mediaSession
 
     override fun onDestroy() {
+        AppContainer.instance?.equalizerController?.detach()
         mediaSession?.run {
             player.release()
             release()

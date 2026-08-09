@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.hh.music.player.BuildConfig
 import com.hh.music.player.data.local.LocalStore
 import com.hh.music.player.ui.ProgressStyle
 
@@ -207,7 +208,7 @@ fun SettingsScreen(
             ElevatedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     AboutRow("应用", "HH音乐")
-                    AboutRow("版本", "v1.3")
+                    AboutRow("版本", "v${BuildConfig.VERSION_NAME}")
                     AboutRow("数据接口", "网易云音乐 (eapi 直连)")
                     AboutRow("参考", "GuitaristRin/Ncrust")
                     AboutRow("技术栈", "Kotlin · Compose M3E · Media3")

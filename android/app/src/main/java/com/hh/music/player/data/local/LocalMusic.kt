@@ -14,9 +14,40 @@ import com.hh.music.player.data.Song
 
 /**
  * 本地音乐支持：扫描设备 MediaStore 中的音频 + 读取 SAF 导入文件的元数据。
- * 本地歌曲使用负数 id，避免与网易云音乐的正数 id 冲突。
+ * 本地歌曲使用负数 id，避免与网易云音乐的正数 id 冲突：
+ *  - MediaStore 歌曲：-(_id)，范围约 [-2^30, 0)
+ *  - SAF 导入歌曲：[uriId]，固定落在 (-2^40-2^31, -2^40) 区间，两类永远不撞。
  */
 object LocalMusic {
+
+    /**
+     * Stable negative id for a SAF/local-file uri, in a reserved range below
+     * -2^40 so it can never collide with MediaStore ids or NetEase positive ids.
+     * Pure function — reused by [songFromUri] and unit-tested on the JVM.
+     */
+    fun uriId(uri: String): Long {
+        val h = (uri.hashCode() and 0x7fffffff).toLong()
+        return -(1L shl 40) - h.coerceAtLeast(0L)
+    }
+
+    /**
+     * Combine MediaStore scan + SAF imports into one deduped list. Entries whose
+     * metadata could not be read (null) are dropped. Pure function — JVM-testable.
+     */
+    fun merge(scanned: List<Song>, importedEntries: List<Song?>): List<Song> {
+        val out = ArrayList<Song>(scanned.size + importedEntries.size)
+        val seen = HashSet<String>()
+        for (s in scanned) {
+            val key = s.localUri ?: "media:${s.id}"
+            if (seen.add(key)) out += s
+        }
+        for (s in importedEntries) {
+            if (s == null) continue // stale/dead uri — caller should prune it
+            val key = s.localUri ?: continue
+            if (seen.add(key)) out += s
+        }
+        return out
+    }
 
     /** Android 13+ 使用细粒度音频权限，更早版本使用存储权限。 */
     fun audioPermission(): String =
@@ -76,7 +107,10 @@ object LocalMusic {
         return songs
     }
 
-    /** 从任意可播放的 content:// uri（SAF 导入）读取元数据并构建 [Song]。 */
+    /**
+     * 从任意可播放的 content:// uri（SAF 导入）读取元数据并构建 [Song]。
+     * 返回 null 表示该 URI 已失效（无权限或文件已删除），调用方可据此清理导入记录。
+     */
     fun songFromUri(context: Context, uriString: String): Song? {
         if (uriString.isBlank()) return null
         val uri = Uri.parse(uriString)
@@ -99,10 +133,11 @@ object LocalMusic {
             runCatching { retriever.release() }
         }
         if (title.isNullOrBlank()) {
-            title = displayName(context, uri) ?: uri.lastPathSegment
+            // 只能通过 SAF 查询拿文件名的场景：查不到说明 URI 已失效（权限被收回/文件被删）。
+            title = displayName(context, uri) ?: return null
         }
         return Song(
-            id = -uriHash(uriString),
+            id = uriId(uriString),
             name = title?.ifBlank { null } ?: "未知歌曲",
             artists = listOf(Artist(name = artist?.ifBlank { null } ?: "未知艺术家")),
             album = Album(name = album.orEmpty()),
@@ -117,6 +152,4 @@ object LocalMusic {
             if (idx >= 0 && cursor.moveToFirst()) cursor.getString(idx) else null
         }
     }.getOrNull()
-
-    private fun uriHash(uri: String): Long = (uri.hashCode() and 0x7fffffff).toLong()
 }
