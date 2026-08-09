@@ -271,10 +271,11 @@ fun PlayerScreen(
             Spacer(Modifier.height(12.dp))
 
             // Cover (stable; recomposes on song change only)
-            if (song != null) {
+            val currentSongForCover = song
+            if (currentSongForCover != null) {
                 ArtworkImage(
-                    url = song.coverUrl,
-                    contentDescription = song.name,
+                    url = currentSongForCover.coverUrl,
+                    contentDescription = currentSongForCover.name,
                     modifier = Modifier
                         .fillMaxWidth(0.72f)
                         .aspectRatio(1f)

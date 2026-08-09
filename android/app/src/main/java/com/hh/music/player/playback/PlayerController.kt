@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /** Logical playback modes shown in the UI. */
@@ -318,20 +319,16 @@ class PlayerController(
     private fun classify(errorCode: Int): FailureCategory = when (errorCode) {
         androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
         androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
-        androidx.media3.common.PlaybackException.ERROR_CODE_IO_TIMEOUT,
         androidx.media3.common.PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
         -> FailureCategory.NETWORK
 
         androidx.media3.common.PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
         androidx.media3.common.PlaybackException.ERROR_CODE_IO_NO_PERMISSION,
         androidx.media3.common.PlaybackException.ERROR_CODE_IO_CLEARTEXT_NOT_PERMITTED,
-        androidx.media3.common.PlaybackException.ERROR_CODE_IO_READ_DATA,
         androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
         androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
-        androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_OTHER,
         androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
         androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED,
-        androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_OTHER,
         -> FailureCategory.CONTENT
 
         else -> FailureCategory.UNKNOWN

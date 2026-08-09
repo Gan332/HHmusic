@@ -5,6 +5,8 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LibraryMusic
@@ -64,6 +67,7 @@ private enum class LibraryTab(val label: String) {
  * 音乐库 — 收藏歌曲 + 最近播放 + 收藏歌单 + 本地音乐。
  * 长按收藏歌曲进入批量管理模式（勾选、批量播放/移除）；有移除按钮的长按菜单随时可用。
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
     onOpenPlaylist: (Long) -> Unit,
@@ -535,6 +539,7 @@ private fun PlaylistPane(
  * 本地音乐页签：MediaStore 扫描（需权限）+ SAF 导入文件（免权限）。
  * 无音频权限时 SAF 导入的文件依然展示；失效 URI 自动从导入记录中清理。
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LocalMusicPane(
     store: LocalStore,

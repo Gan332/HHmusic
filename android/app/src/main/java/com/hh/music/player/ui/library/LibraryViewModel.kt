@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class LibraryViewModel(store: LocalStore) : ViewModel() {
+class LibraryViewModel(private val store: LocalStore) : ViewModel() {
     val favorites: StateFlow<List<Song>> =
         store.favorites.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 

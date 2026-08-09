@@ -64,7 +64,7 @@ class DownloadManager(
             local.autoCache.collect { autoCacheEnabled = it }
         }
         scope.launch {
-            local.cacheCapMb.collect { capMb = it.toLong().coerceAtLeast(0L) }
+            local.cacheCapMb.collect { capMb = it.coerceAtLeast(0) }
         }
         scope.launch {
             local.downloads.collect { list ->
@@ -249,8 +249,8 @@ class DownloadManager(
      * Never evicts the currently playing song ([playingIds]); a cap of 0 disables
      * the cap check entirely (treat as "no limit").
      */
-    private fun evictIf() {
-        val cap = OfflineCache.capBytes(capMb)
+    private suspend fun evictIf() {
+        val cap = OfflineCache.capBytes(capMb.toLong())
         if (cap <= 0L) return
         val toEvict = OfflineCache.evictionCandidates(
             entries = _entries.value.filter { !it.isFailed },

@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -94,57 +95,51 @@ fun DiscoverScreen(
             }
         }
     ) { padding ->
-        PullToRefreshBox(
-            isRefreshing = state.refreshing,
-            onRefresh = { vm.refresh(force = true) },
-            modifier = Modifier.fillMaxSize().padding(padding)
-        ) {
-            Box(Modifier.fillMaxSize()) {
-                when {
-                    state.allEmpty && state.recommend.loading -> LoadingState()
-                    state.allEmpty && state.allFailed -> ErrorState("推荐加载失败，请检查网络", { vm.refresh(force = true) })
-                    else -> LazyColumn(Modifier.fillMaxSize()) {
-                        item { QuickEntries(state, onOpenToplist, player::playQueue) }
-                        item {
-                            Spacer(Modifier.height(10.dp))
-                            SectionTitle(
-                                title = "每日推荐",
-                                subtitle = "为你精选",
-                                onMore = { moreSection = MoreSection.RECOMMEND }
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            when {
+                state.allEmpty && state.recommend.loading -> LoadingState()
+                state.allEmpty && state.allFailed -> ErrorState("推荐加载失败，请检查网络", { vm.refresh(force = true) })
+                else -> LazyColumn(Modifier.fillMaxSize()) {
+                    item { QuickEntries(state, onOpenToplist, player::playQueue) }
+                    item {
+                        Spacer(Modifier.height(10.dp))
+                        SectionTitle(
+                            title = "每日推荐",
+                            subtitle = "为你精选",
+                            onMore = { moreSection = MoreSection.RECOMMEND }
+                        )
+                        SectionContent(state.recommend, onRetry = { vm.refresh(force = true) }) {
+                            SongCarousel(
+                                songs = it.take(10),
+                                activeId = currentSong?.id,
+                                isPlaying = isPlaying,
+                                onPlay = { index -> player.playQueue(state.recommend.data, index) }
                             )
-                            SectionContent(state.recommend, onRetry = { vm.refresh(force = true) }) {
-                                SongCarousel(
-                                    songs = it.take(10),
-                                    activeId = currentSong?.id,
-                                    isPlaying = isPlaying,
-                                    onPlay = { index -> player.playQueue(state.recommend.data, index) }
-                                )
-                            }
                         }
-                        item {
-                            Spacer(Modifier.height(18.dp))
-                            SectionTitle(title = "推荐歌单", subtitle = "更多好音乐", onMore = { moreSection = MoreSection.PLAYLISTS })
-                            SectionContent(state.playlists, onRetry = { vm.refresh(force = true) }) {
-                                PlaylistCarousel(it, onOpenPlaylist)
-                            }
-                        }
-                        item {
-                            Spacer(Modifier.height(18.dp))
-                            SectionTitle(title = "新歌速递", subtitle = "最近上新", onMore = { moreSection = MoreSection.NEW })
-                            SectionContent(state.newSongs, onRetry = { vm.refresh(force = true) }) {
-                                SongCarousel(
-                                    songs = it.take(10),
-                                    activeId = currentSong?.id,
-                                    isPlaying = isPlaying,
-                                    onPlay = { index -> player.playQueue(state.newSongs.data, index) }
-                                )
-                            }
-                        }
-                        item { Spacer(Modifier.height(88.dp)) }
                     }
+                    item {
+                        Spacer(Modifier.height(18.dp))
+                        SectionTitle(title = "推荐歌单", subtitle = "更多好音乐", onMore = { moreSection = MoreSection.PLAYLISTS })
+                        SectionContent(state.playlists, onRetry = { vm.refresh(force = true) }) {
+                            PlaylistCarousel(it, onOpenPlaylist)
+                        }
+                    }
+                    item {
+                        Spacer(Modifier.height(18.dp))
+                        SectionTitle(title = "新歌速递", subtitle = "最近上新", onMore = { moreSection = MoreSection.NEW })
+                        SectionContent(state.newSongs, onRetry = { vm.refresh(force = true) }) {
+                            SongCarousel(
+                                songs = it.take(10),
+                                activeId = currentSong?.id,
+                                isPlaying = isPlaying,
+                                onPlay = { index -> player.playQueue(state.newSongs.data, index) }
+                            )
+                        }
+                    }
+                    item { Spacer(Modifier.height(88.dp)) }
                 }
-                MiniPlayerBar(player, onOpenPlayer, Modifier.align(Alignment.BottomCenter))
             }
+            MiniPlayerBar(player, onOpenPlayer, Modifier.align(Alignment.BottomCenter))
         }
     }
 
@@ -303,7 +298,6 @@ private fun SectionTitle(title: String, subtitle: String, onMore: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SongCarousel(
     songs: List<Song>,
@@ -312,52 +306,43 @@ private fun SongCarousel(
     onPlay: (Int) -> Unit
 ) {
     if (songs.isEmpty()) return
-    val carouselState = rememberCarouselState(initialItem = 0, itemCount = { songs.size })
-    HorizontalMultiBrowseCarousel(
-        state = carouselState,
-        preferredItemWidth = 200.dp,
-        itemSpacing = 12.dp,
+    LazyRow(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = 16.dp)
-    ) { itemIndex ->
-        val song = songs[itemIndex]
-        key(song.id) {
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        itemsIndexed(songs) { itemIndex, song ->
             MediaTile(
                 title = song.name,
                 subtitle = song.artistText,
                 imageUrl = song.coverUrl,
                 active = song.id == activeId && isPlaying,
                 onClick = { onPlay(itemIndex) },
-                modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge)
+                modifier = Modifier.width(200.dp).clip(MaterialTheme.shapes.extraLarge)
             )
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PlaylistCarousel(
     playlists: List<RecommendPlaylistItem>,
     onClick: (Long) -> Unit
 ) {
     if (playlists.isEmpty()) return
-    val carouselState = rememberCarouselState(initialItem = 0, itemCount = { playlists.size })
-    HorizontalMultiBrowseCarousel(
-        state = carouselState,
-        preferredItemWidth = 156.dp,
-        itemSpacing = 12.dp,
+    LazyRow(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = 16.dp)
-    ) { itemIndex ->
-        val playlist = playlists[itemIndex]
-        key(playlist.id) {
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        itemsIndexed(playlists) { itemIndex, playlist ->
             MediaTile(
                 title = playlist.name,
                 subtitle = playlist.creatorName.ifBlank { "精选歌单" },
                 imageUrl = playlist.coverUrl,
                 active = false,
-                onClick = { onClick(playlist.id) },
-                modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge)
+                onClick = { onClick(playlists[itemIndex].id) },
+                modifier = Modifier.width(156.dp).clip(MaterialTheme.shapes.extraLarge)
             )
         }
     }

@@ -2,18 +2,16 @@ package com.hh.music.player.ui.playlist
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
-import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
-import androidx.compose.material3.carousel.rememberCarouselState
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
-import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,71 +47,64 @@ fun ToplistScreen(
                     color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.padding(top = 4.dp)
                 )
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = vm::refresh) {
+                    Icon(Icons.Filled.Refresh, contentDescription = "刷新")
+                }
             }
         }
     ) { padding ->
-        PullToRefreshBox(
-            isRefreshing = state.loading,
-            onRefresh = vm::refresh,
-            modifier = Modifier.fillMaxSize().padding(padding)
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                when {
-                    state.loading && state.toplists.isEmpty() ->
-                        CircularProgressIndicator(Modifier.align(Alignment.Center))
-                    state.error != null -> Text(
-                        state.error!!,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.align(Alignment.Center).padding(24.dp)
-                    )
-                    else -> LazyColumn(Modifier.fillMaxSize()) {
-                        if (state.toplists.isNotEmpty()) {
-                            item {
-                                SectionTitle("巅峰榜", "官方权威榜单")
-                                ToplistCarousel(state.toplists.take(5), onPlaylistClick)
-                            }
-                            item {
-                                Spacer(Modifier.height(14.dp))
-                                SectionTitle("全部榜单", "${state.toplists.size} 个")
-                            }
-                        }
-                        items(state.toplists, key = { it.id }) { item ->
-                            ToplistRow(item.name, item.coverImgUrl, item.updateFrequency) {
-                                onPlaylistClick(item.id)
-                            }
-                        }
-                        item { Spacer(Modifier.height(72.dp)) }
-                    }
-                }
-                MiniPlayerBar(
-                    player = player,
-                    onClick = { },
-                    modifier = Modifier.align(Alignment.BottomCenter)
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            when {
+                state.loading && state.toplists.isEmpty() ->
+                    CircularProgressIndicator(Modifier.align(Alignment.Center))
+                state.error != null -> Text(
+                    state.error!!,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.align(Alignment.Center).padding(24.dp)
                 )
+                else -> LazyColumn(Modifier.fillMaxSize()) {
+                    if (state.toplists.isNotEmpty()) {
+                        item {
+                            SectionTitle("巅峰榜", "官方权威榜单")
+                            ToplistCarousel(state.toplists.take(5), onPlaylistClick)
+                        }
+                        item {
+                            Spacer(Modifier.height(14.dp))
+                            SectionTitle("全部榜单", "${state.toplists.size} 个")
+                        }
+                    }
+                    items(state.toplists, key = { it.id }) { item ->
+                        ToplistRow(item.name, item.coverImgUrl, item.updateFrequency) {
+                            onPlaylistClick(item.id)
+                        }
+                    }
+                    item { Spacer(Modifier.height(72.dp)) }
+                }
             }
+            MiniPlayerBar(
+                player = player,
+                onClick = { },
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ToplistCarousel(
     toplists: List<com.hh.music.player.data.ToplistItem>,
     onPlaylistClick: (Long) -> Unit
 ) {
-    val carouselState = rememberCarouselState(initialItem = 0, itemCount = { toplists.size })
-    HorizontalMultiBrowseCarousel(
-        state = carouselState,
-        preferredItemWidth = 180.dp,
-        itemSpacing = 12.dp,
+    LazyRow(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = 16.dp)
-    ) { itemIndex ->
-        val item = toplists[itemIndex]
-        key(item.id) {
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(toplists, key = { it.id }) { item ->
             ElevatedCard(
                 onClick = { onPlaylistClick(item.id) },
-                modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge)
+                modifier = Modifier.width(180.dp).clip(MaterialTheme.shapes.extraLarge)
             ) {
                 Box(Modifier.fillMaxWidth().aspectRatio(1f)) {
                     ArtworkImage(

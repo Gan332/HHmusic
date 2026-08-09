@@ -9,8 +9,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,6 +65,9 @@ fun PlaylistScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { vm.load(playlistId) }) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "刷新")
+                    }
                     TooltipBox(
                         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                         tooltip = {
@@ -99,54 +102,48 @@ fun PlaylistScreen(
             )
         }
     ) { padding ->
-        PullToRefreshBox(
-            isRefreshing = state.loading,
-            onRefresh = { vm.load(playlistId) },
-            modifier = Modifier.fillMaxSize().padding(padding)
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                when {
-                    state.loading && playlist == null ->
-                        CircularProgressIndicator(Modifier.align(Alignment.Center))
-                    state.error != null -> Text(
-                        state.error!!,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.align(Alignment.Center).padding(24.dp)
-                    )
-                    else -> {
-                        val tracks = playlist?.tracks.orEmpty()
-                        LazyColumn(Modifier.fillMaxSize()) {
-                            if (playlist != null) {
-                                item {
-                                    PlaylistHeader(
-                                        coverUrl = playlist.coverImgUrl.orEmpty(),
-                                        name = playlist.name,
-                                        creator = playlist.creator?.nickname.orEmpty(),
-                                        trackCount = tracks.size,
-                                        onPlayAll = { playFrom(0) }
-                                    )
-                                }
-                            }
-                            itemsIndexed(tracks) { index, song ->
-                                SongRow(
-                                    song = song,
-                                    index = index,
-                                    isActive = song.id == currentSong?.id,
-                                    isPlaying = song.id == currentSong?.id && isPlaying,
-                                    onClick = { playFrom(index) }
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            when {
+                state.loading && playlist == null ->
+                    CircularProgressIndicator(Modifier.align(Alignment.Center))
+                state.error != null -> Text(
+                    state.error!!,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.align(Alignment.Center).padding(24.dp)
+                )
+                else -> {
+                    val tracks = playlist?.tracks.orEmpty()
+                    LazyColumn(Modifier.fillMaxSize()) {
+                        if (playlist != null) {
+                            item {
+                                PlaylistHeader(
+                                    coverUrl = playlist.coverImgUrl.orEmpty(),
+                                    name = playlist.name,
+                                    creator = playlist.creator?.nickname.orEmpty(),
+                                    trackCount = tracks.size,
+                                    onPlayAll = { playFrom(0) }
                                 )
-                                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
                             }
-                            item { Spacer(Modifier.height(72.dp)) }
                         }
+                        itemsIndexed(tracks) { index, song ->
+                            SongRow(
+                                song = song,
+                                index = index,
+                                isActive = song.id == currentSong?.id,
+                                isPlaying = song.id == currentSong?.id && isPlaying,
+                                onClick = { playFrom(index) }
+                            )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                        }
+                        item { Spacer(Modifier.height(72.dp)) }
                     }
                 }
-                MiniPlayerBar(
-                    player = player,
-                    onClick = { },
-                    modifier = Modifier.align(Alignment.BottomCenter)
-                )
             }
+            MiniPlayerBar(
+                player = player,
+                onClick = { },
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
         }
     }
 }

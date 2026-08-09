@@ -73,9 +73,9 @@ class EqualizerController(
         }
         eq = create
         _isAvailable.value = true
-        _bandCount.value = runCatching { create.numberOfBands }.getOrDefault(0)
+        _bandCount.value = runCatching { create.numberOfBands.toInt() }.getOrDefault(0)
         _bandFreqs.value = runCatching {
-            List(create.numberOfBands) { i -> create.getCenterFreq(i.toShort()) }
+            List(create.numberOfBands.toInt()) { i -> create.getCenterFreq(i.toShort()) }
         }.getOrDefault(emptyList())
         applyFromStore()
     }
@@ -112,7 +112,7 @@ class EqualizerController(
             if (systemIndex >= 0) {
                 e.usePreset(systemIndex.toShort())
             } else {
-                applyBandLevels(e, EqualizerPresets.resolveBandLevels(presetKey, e.numberOfBands, customBands))
+                applyBandLevels(e, EqualizerPresets.resolveBandLevels(presetKey, e.numberOfBands.toInt(), customBands))
             }
         }
     }
@@ -121,7 +121,7 @@ class EqualizerController(
     private fun systemPresetIndex(e: Equalizer, presetKey: String): Int {
         val aliases = EqualizerPresets.systemAliases(presetKey)
         if (aliases.isEmpty()) return -1
-        val count = runCatching { e.numberOfPresets }.getOrDefault(0)
+        val count = runCatching { e.numberOfPresets.toInt() }.getOrDefault(0)
         for (i in 0 until count) {
             val name = runCatching { e.getPresetName(i.toShort()) }
                 .getOrNull()?.lowercase()?.trim() ?: continue
