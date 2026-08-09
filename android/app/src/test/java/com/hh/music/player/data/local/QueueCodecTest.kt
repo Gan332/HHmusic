@@ -54,7 +54,7 @@ class QueueCodecTest {
 
     @Test
     fun `huge queues are capped to MAX_QUEUED`() {
-        val many = (0 until QueueCodec.MAX_QUEUED * 2).map { id -> song(id) }
+        val many = (0 until QueueCodec.MAX_QUEUED * 2).map { id -> song(id.toLong()) }
         val raw = QueueCodec.encode(many, index = QueueCodec.MAX_QUEUED * 2 - 1)
         val back = QueueCodec.decode(raw)!!
         assertEquals(QueueCodec.MAX_QUEUED, back.songs.size)
