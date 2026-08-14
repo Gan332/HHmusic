@@ -88,7 +88,7 @@ class PlaybackEngineTest {
 
     // ---------------- queue index bookkeeping ----------------
 
-@Test
+    @Test
     fun `removing a track before the current one shifts it down`() {
         assertEquals(1, PlaybackEngine.indexAfterRemove(currentIndex = 2, removedIndex = 0, newSize = 4))
     }
@@ -113,7 +113,7 @@ class PlaybackEngineTest {
         assertEquals(1, PlaybackEngine.indexAfterMove(currentIndex = 0, from = 2, to = 0))
         assertEquals(2, PlaybackEngine.indexAfterMove(currentIndex = 3, from = 1, to = 3))
         assertEquals(3, PlaybackEngine.indexAfterMove(currentIndex = 3, from = 1, to = 2))
-        assertEquals(3, PlaybackEngine.indexAfterMove(currentIndex = 3, from = 1, to = 5))
+        assertEquals(2, PlaybackEngine.indexAfterMove(currentIndex = 3, from = 1, to = 5))
     }
 
     @Test

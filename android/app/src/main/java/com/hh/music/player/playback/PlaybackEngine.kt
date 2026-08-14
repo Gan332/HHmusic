@@ -59,14 +59,14 @@ object PlaybackEngine {
     /**
      * Maintain the "current" index after removing [removedIndex] (used by
      * remove-from-queue without MediaController feedback races). Mirror of
-     * ExoPlayer's behaviour: removal before/at the current index shifts it.
+     * ExoPlayer's behaviour: removal before/at the current index shifts it,
+     * and an emptied queue leaves no current item (-1).
      */
     fun indexAfterRemove(currentIndex: Int, removedIndex: Int, newSize: Int): Int {
-        if (currentIndex < 0) return currentIndex
-        val updatedSize = newSize.coerceAtLeast(1)
-        // ExoPlayer clamps the current index to the last remaining item (or -1).
+        if (currentIndex < 0 || newSize <= 0) return -1
+        // ExoPlayer clamps the current index to the last remaining item.
         return if (removedIndex == currentIndex) {
-            currentIndex.coerceAtMost(updatedSize - 1)
+            currentIndex.coerceAtMost(newSize - 1)
         } else if (removedIndex < currentIndex) {
             currentIndex - 1
         } else {
