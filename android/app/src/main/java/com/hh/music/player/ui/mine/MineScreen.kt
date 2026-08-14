@@ -7,7 +7,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material3.*
+import com.hh.music.player.ui.components.EmptyState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +39,7 @@ fun MineScreen(
     val isPlaying by player.isPlaying.collectAsState()
 
     var tab by remember { mutableStateOf(0) }
+    var showClearRecentDialog by remember { mutableStateOf(false) }
     val tabs = listOf("收藏", "最近播放", "歌单")
 
     Scaffold(
@@ -62,7 +65,10 @@ fun MineScreen(
                 )
                 1 -> Column(Modifier.fillMaxSize()) {
                     Row(Modifier.fillMaxWidth().padding(end = 12.dp, top = 4.dp), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { vm.clearRecent() }) {
+                        TextButton(
+                            enabled = recent.isNotEmpty(),
+                            onClick = { showClearRecentDialog = true }
+                        ) {
                             Icon(Icons.Filled.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(4.dp))
                             Text("清空")
@@ -86,6 +92,23 @@ fun MineScreen(
             MiniPlayerBar(player = player, onClick = onOpenPlayer, modifier = Modifier.align(Alignment.BottomCenter))
         }
     }
+
+    if (showClearRecentDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearRecentDialog = false },
+            title = { Text("清空最近播放") },
+            text = { Text("将删除全部最近播放记录，此操作无法撤销。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.clearRecent()
+                    showClearRecentDialog = false
+                }) { Text("清空") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearRecentDialog = false }) { Text("取消") }
+            }
+        )
+    }
 }
 
 @Composable
@@ -98,9 +121,10 @@ private fun SongListPane(
     modifier: Modifier = Modifier
 ) {
     if (songs.isEmpty()) {
-        Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(emptyHint, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        EmptyState(
+            hint = emptyHint,
+            modifier = modifier
+        )
         return
     }
     LazyColumn(modifier.fillMaxSize()) {
@@ -124,9 +148,10 @@ private fun SavedPlaylistList(
     emptyHint: String
 ) {
     if (playlists.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(emptyHint, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        EmptyState(
+            hint = emptyHint,
+            icon = Icons.Filled.QueueMusic
+        )
         return
     }
     LazyColumn(Modifier.fillMaxSize().padding(12.dp)) {

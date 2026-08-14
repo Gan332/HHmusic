@@ -363,6 +363,7 @@ private fun MediaTile(
                 .fillMaxWidth()
                 .aspectRatio(1f)
                 .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                .clickable(onClick = onClick)
         ) {
             ArtworkImage(
                 url = imageUrl,
