@@ -24,6 +24,7 @@ import com.hh.music.player.data.SavedPlaylist
 import com.hh.music.player.ui.LocalPlayerController
 import com.hh.music.player.ui.LocalStoreProvider
 import com.hh.music.player.ui.components.ArtworkImage
+import com.hh.music.player.ui.components.ErrorState
 import com.hh.music.player.ui.components.MiniPlayerBar
 import com.hh.music.player.ui.components.SongRow
 import kotlinx.coroutines.launch
@@ -34,6 +35,7 @@ fun PlaylistScreen(
     playlistId: Long,
     repository: MusicRepository,
     onBack: () -> Unit,
+    onOpenPlayer: () -> Unit,
     vm: PlaylistViewModel = viewModel { PlaylistViewModel(repository) }
 ) {
     val state by vm.state.collectAsState()
@@ -106,10 +108,10 @@ fun PlaylistScreen(
             when {
                 state.loading && playlist == null ->
                     CircularProgressIndicator(Modifier.align(Alignment.Center))
-                state.error != null -> Text(
-                    state.error!!,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.align(Alignment.Center).padding(24.dp)
+                state.error != null -> ErrorState(
+                    message = state.error.orEmpty(),
+                    onRetry = { vm.load(playlistId) },
+                    modifier = Modifier.align(Alignment.Center)
                 )
                 else -> {
                     val tracks = playlist?.tracks.orEmpty()
@@ -141,7 +143,7 @@ fun PlaylistScreen(
             }
             MiniPlayerBar(
                 player = player,
-                onClick = { },
+                onClick = onOpenPlayer,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
         }

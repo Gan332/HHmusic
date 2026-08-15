@@ -21,6 +21,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.hh.music.player.data.MusicRepository
 import com.hh.music.player.ui.LocalPlayerController
 import com.hh.music.player.ui.components.ArtworkImage
+import com.hh.music.player.ui.components.ErrorState
 import com.hh.music.player.ui.components.MiniPlayerBar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,6 +30,7 @@ fun ToplistScreen(
     repository: MusicRepository,
     onPlaylistClick: (Long) -> Unit,
     onBack: () -> Unit,
+    onOpenPlayer: () -> Unit,
     vm: ToplistViewModel = viewModel { ToplistViewModel(repository) }
 ) {
     val state by vm.state.collectAsState()
@@ -58,10 +60,10 @@ fun ToplistScreen(
             when {
                 state.loading && state.toplists.isEmpty() ->
                     CircularProgressIndicator(Modifier.align(Alignment.Center))
-                state.error != null -> Text(
-                    state.error!!,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.align(Alignment.Center).padding(24.dp)
+                state.error != null -> ErrorState(
+                    message = state.error.orEmpty(),
+                    onRetry = vm::refresh,
+                    modifier = Modifier.align(Alignment.Center)
                 )
                 else -> LazyColumn(Modifier.fillMaxSize()) {
                     if (state.toplists.isNotEmpty()) {
@@ -84,7 +86,7 @@ fun ToplistScreen(
             }
             MiniPlayerBar(
                 player = player,
-                onClick = { },
+                onClick = onOpenPlayer,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
         }

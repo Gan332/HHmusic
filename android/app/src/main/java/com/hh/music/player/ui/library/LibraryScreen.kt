@@ -86,6 +86,8 @@ fun LibraryScreen(
     val isPlaying by player.isPlaying.collectAsState()
     var tab by remember { mutableStateOf(LibraryTab.SONGS) }
     var showClearRecentDialog by remember { mutableStateOf(false) }
+    var showRemoveSelectedDialog by remember { mutableStateOf(false) }
+    var showClearDownloadsDialog by remember { mutableStateOf(false) }
     var actionsSong by remember { mutableStateOf<Song?>(null) }
 
     // 收藏歌曲批量管理（长按进入、勾选、批量播放/移除）。
@@ -152,10 +154,7 @@ fun LibraryScreen(
                             Text("播放选中")
                         }
                         FilledTonalButton(
-                            onClick = {
-                                selectedIds.forEach { vm.removeFavorite(it) }
-                                exitManage()
-                            },
+                            onClick = { showRemoveSelectedDialog = true },
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -244,7 +243,8 @@ fun LibraryScreen(
                     currentSongId = currentSong?.id,
                     isPlaying = isPlaying,
                     onPlaySong = { song -> player.playQueue(listOf(song)) },
-                    onLongPress = { song -> actionsSong = song }
+                    onLongPress = { song -> actionsSong = song },
+                    onClear = { showClearDownloadsDialog = true }
                 )
             }
             MiniPlayerBar(player = player, onClick = onOpenPlayer, modifier = Modifier.align(Alignment.BottomCenter))
@@ -266,6 +266,41 @@ fun LibraryScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showClearRecentDialog = false }) { Text("取消") }
+            }
+        )
+    }
+
+    if (showRemoveSelectedDialog) {
+        AlertDialog(
+            onDismissRequest = { showRemoveSelectedDialog = false },
+            title = { Text("移除已选歌曲？") },
+            text = { Text("将从收藏中移除 ${selectedIds.size} 首歌曲，此操作无法撤销。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    selectedIds.forEach { vm.removeFavorite(it) }
+                    showRemoveSelectedDialog = false
+                    exitManage()
+                }) { Text("移除") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRemoveSelectedDialog = false }) { Text("取消") }
+            }
+        )
+    }
+
+    if (showClearDownloadsDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDownloadsDialog = false },
+            title = { Text("清空下载缓存？") },
+            text = { Text("将删除已下载文件、失败记录和下载中的任务。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    downloadManager.clear()
+                    showClearDownloadsDialog = false
+                }) { Text("清空") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDownloadsDialog = false }) { Text("取消") }
             }
         )
     }
@@ -320,7 +355,8 @@ private fun DownloadsPane(
     currentSongId: Long?,
     isPlaying: Boolean,
     onPlaySong: (Song) -> Unit,
-    onLongPress: (Song) -> Unit
+    onLongPress: (Song) -> Unit,
+    onClear: () -> Unit
 ) {
     val store = LocalStoreProvider.current
     val entries by downloadManager.entries.collectAsState(initial = emptyList())
@@ -354,9 +390,7 @@ private fun DownloadsPane(
             }
             TextButton(
                 enabled = entries.isNotEmpty() || downloading.isNotEmpty(),
-                onClick = {
-                    downloadManager.clear()
-                }
+                onClick = onClear
             ) {
                 Text("清空")
             }

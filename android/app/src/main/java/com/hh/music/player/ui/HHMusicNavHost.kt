@@ -168,7 +168,8 @@ fun HHMusicNavHost(container: AppContainer) {
                     ToplistScreen(
                         repository = container.repository,
                         onPlaylistClick = { id -> navController.navigate(Routes.playlist(id)) },
-                        onBack = { navController.popBackStack() }
+                        onBack = { navController.popBackStack() },
+                        onOpenPlayer = { navController.navigate(Routes.PLAYER) }
                     )
                 }
                 composable(Routes.LIBRARY) {
@@ -195,7 +196,8 @@ fun HHMusicNavHost(container: AppContainer) {
                     PlaylistScreen(
                         playlistId = id,
                         repository = container.repository,
-                        onBack = { navController.popBackStack() }
+                        onBack = { navController.popBackStack() },
+                        onOpenPlayer = { navController.navigate(Routes.PLAYER) }
                     )
                 }
                 composable(Routes.PLAYER) {
