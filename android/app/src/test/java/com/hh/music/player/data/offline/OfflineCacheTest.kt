@@ -18,7 +18,7 @@ class OfflineCacheTest {
     @Test
     fun `capacity and total bytes clamp negative values`() {
         assertEquals(0L, OfflineCache.capBytes(-1))
-        assertEquals(3L, OfflineCache.totalBytes(listOf(entry(1, 10), entry(2, -5))))
+        assertEquals(10L, OfflineCache.totalBytes(listOf(entry(1, 10), entry(2, -5))))
         assertEquals("0 B", OfflineCache.formatBytes(-1))
     }
 

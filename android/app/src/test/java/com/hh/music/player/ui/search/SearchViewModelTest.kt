@@ -119,9 +119,11 @@ class SearchViewModelTest {
 
         vm.submitSearch("retry")
         runCurrent()
+        runCurrent()
         assertTrue(vm.state.value.error != null)
         fail = false
         vm.retry()
+        runCurrent()
         runCurrent()
         assertEquals(null, vm.state.value.error)
         assertEquals(listOf("retry"), vm.state.value.results.map { it.name })
@@ -147,11 +149,14 @@ class SearchViewModelTest {
 
         vm.submitSearch("pages")
         runCurrent()
+        runCurrent()
         vm.loadMore()
+        runCurrent()
         runCurrent()
         assertTrue(vm.state.value.loadMoreError != null)
         failMore = false
         vm.loadMore()
+        runCurrent()
         runCurrent()
         assertEquals(null, vm.state.value.loadMoreError)
         assertEquals(45, vm.state.value.results.size)
