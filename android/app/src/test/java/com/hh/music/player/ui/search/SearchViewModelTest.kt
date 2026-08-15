@@ -15,6 +15,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -110,7 +111,7 @@ class SearchViewModelTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val api = FakeApi()
         val vm = SearchViewModel(
-            MusicRepository(api, ioDispatcher = StandardTestDispatcher(testScheduler)).apply { useBackend = true }
+            MusicRepository(api, ioDispatcher = UnconfinedTestDispatcher(testScheduler)).apply { useBackend = true }
         )
         var fail = true
         api.handler = { kw, _, _ ->
@@ -134,7 +135,7 @@ class SearchViewModelTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val api = FakeApi()
         val vm = SearchViewModel(
-            MusicRepository(api, ioDispatcher = StandardTestDispatcher(testScheduler)).apply { useBackend = true }
+            MusicRepository(api, ioDispatcher = UnconfinedTestDispatcher(testScheduler)).apply { useBackend = true }
         )
         var failMore = true
         api.handler = { kw, limit, offset ->
