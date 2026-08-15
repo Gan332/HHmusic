@@ -116,6 +116,11 @@ class SearchViewModel(
     }
 
     /** Fetch the next page (offset = current result count) and append it. */
+    fun retry() {
+        val q = _state.value.query.trim()
+        if (q.isNotEmpty()) submitSearch(q)
+    }
+
     fun loadMore() {
         val s = _state.value
         if (s.loading || s.loadingMore || !s.hasMore || s.query.isBlank()) return

@@ -5,13 +5,16 @@ import com.hh.music.player.data.MusicRepository
 import com.hh.music.player.data.Song
 import com.hh.music.player.data.local.LocalStore
 import com.hh.music.player.network.DirectNcmClient
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import okhttp3.Call
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
@@ -35,6 +38,19 @@ class DownloadManager(
     private val appContext = context.applicationContext
     private val downloadsDir = File(appContext.getExternalFilesDir(null), "downloads")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val activeIds = mutableSetOf<Long>()
+    private val activeJobs = mutableMapOf<Long, Job>()
+    private val activeCalls = mutableMapOf<Long, Call>()
+
+    private fun reserve(songId: Long): Boolean = synchronized(activeIds) {
+        if (!activeIds.add(songId)) false else true
+    }
+
+    private fun release(songId: Long) {
+        synchronized(activeIds) { activeIds.remove(songId) }
+        activeJobs.remove(songId)
+        activeCalls.remove(songId)
+    }
 
     private val _entries = MutableStateFlow<List<DownloadEntry>>(emptyList())
     /** Persisted download records: finished files + failed markers (error != null). */
@@ -102,36 +118,41 @@ class DownloadManager(
     /** Start (or restart) a download for [song]. Resolves the URL itself. */
     fun download(song: Song) {
         if (song.isLocal) return
-        scope.launch {
-            if (fileFor(song.id) != null) return@launch
-            if (_statuses.value[song.id]?.state == DownloadState.DOWNLOADING) return@launch
-            _statuses.value = _statuses.value + (song.id to DownloadStatus(DownloadState.DOWNLOADING, song = song))
-            val result = runCatching {
-                val urlInfo = repository.songUrl(song.id).getOrThrow()
-                val url = urlInfo.url
-                require(!url.isNullOrBlank()) { "无法获取播放地址（可能为会员或版权受限）" }
-                downloadToFile(song, url, urlInfo.type)
-            }
-            result.fold(
-                onSuccess = { entry ->
-                    _statuses.value = _statuses.value + (song.id to DownloadStatus(DownloadState.DONE, 100, song = song))
-                    _entries.value = (_entries.value.filter { it.id != song.id } + entry)
-                            .sortedByDescending { it.downloadedAt }
-                    local.setDownloads(_entries.value)
-                    evictIf()
-                },
-                onFailure = { e ->
-                    File(downloadsDir, "tmp_${song.id}").delete() // drop a half-written file
-                    val reason = e.message?.takeIf { it.isNotBlank() } ?: "下载失败"
-                    _statuses.value = _statuses.value + (
-                        song.id to DownloadStatus(DownloadState.ERROR, 0, reason, song = song)
-                    )
-                    val failed = DownloadEntry(song = song, error = reason)
-                    _entries.value = _entries.value.filter { it.id != song.id } + failed
-                    local.setDownloads(_entries.value)
+        if (fileFor(song.id) != null || !reserve(song.id)) return
+        val job = scope.launch {
+            try {
+                _statuses.value = _statuses.value + (song.id to DownloadStatus(DownloadState.DOWNLOADING, song = song))
+                val result = runCatching {
+                    val urlInfo = repository.songUrl(song.id).getOrThrow()
+                    val url = urlInfo.url
+                    require(!url.isNullOrBlank()) { "无法获取播放地址（可能为会员或版权受限）" }
+                    downloadToFile(song, url, urlInfo.type)
                 }
-            )
+                result.fold(
+                    onSuccess = { entry ->
+                        _statuses.value = _statuses.value + (song.id to DownloadStatus(DownloadState.DONE, 100, song = song))
+                        _entries.value = (_entries.value.filter { it.id != song.id } + entry)
+                            .sortedByDescending { it.downloadedAt }
+                        local.setDownloads(_entries.value)
+                        evictIf()
+                    },
+                    onFailure = { e ->
+                        if (e is CancellationException) throw e
+                        File(downloadsDir, "tmp_${song.id}").delete()
+                        val reason = e.message?.takeIf { it.isNotBlank() } ?: "下载失败"
+                        _statuses.value = _statuses.value + (
+                            song.id to DownloadStatus(DownloadState.ERROR, 0, reason, song = song)
+                        )
+                        val failed = DownloadEntry(song = song, error = reason)
+                        _entries.value = _entries.value.filter { it.id != song.id } + failed
+                        local.setDownloads(_entries.value)
+                    }
+                )
+            } finally {
+                release(song.id)
+            }
         }
+        activeJobs[song.id] = job
     }
 
     /**
@@ -142,32 +163,38 @@ class DownloadManager(
         if (!autoCacheEnabled) return
         if (song.isLocal) return
         if (resolvedUrl.isNullOrBlank()) return
-        scope.launch {
-            if (fileFor(song.id) != null) return@launch
-            if (_statuses.value[song.id]?.state == DownloadState.DOWNLOADING) return@launch
-            _statuses.value = _statuses.value + (song.id to DownloadStatus(DownloadState.DOWNLOADING, song = song))
-            val result = runCatching {
-                downloadToFile(song, resolvedUrl, extractFromUrl(resolvedUrl))
-            }
-            result.fold(
-                onSuccess = { entry ->
-                    _statuses.value = _statuses.value + (song.id to DownloadStatus(DownloadState.DONE, 100, song = song))
-                    _entries.value = (_entries.value.filter { it.id != song.id } + entry)
-                            .sortedByDescending { it.downloadedAt }
-                    local.setDownloads(_entries.value)
-                    evictIf()
-                },
-                onFailure = {
-                    // auto-cache failures stay silent (VIP/copyright) — no error entry
-                    File(downloadsDir, "tmp_${song.id}").delete()
-                    _statuses.value = _statuses.value - song.id
+        if (fileFor(song.id) != null || !reserve(song.id)) return
+        val job = scope.launch {
+            try {
+                _statuses.value = _statuses.value + (song.id to DownloadStatus(DownloadState.DOWNLOADING, song = song))
+                val result = runCatching {
+                    downloadToFile(song, resolvedUrl, extractFromUrl(resolvedUrl))
                 }
-            )
+                result.fold(
+                    onSuccess = { entry ->
+                        _statuses.value = _statuses.value + (song.id to DownloadStatus(DownloadState.DONE, 100, song = song))
+                        _entries.value = (_entries.value.filter { it.id != song.id } + entry)
+                            .sortedByDescending { it.downloadedAt }
+                        local.setDownloads(_entries.value)
+                        evictIf()
+                    },
+                    onFailure = { e ->
+                        if (e is CancellationException) throw e
+                        File(downloadsDir, "tmp_${song.id}").delete()
+                        _statuses.value = _statuses.value - song.id
+                    }
+                )
+            } finally {
+                release(song.id)
+            }
         }
+        activeJobs[song.id] = job
     }
 
     /** Delete one download (file + record + status). */
     fun remove(songId: Long) {
+        activeCalls[songId]?.cancel()
+        activeJobs[songId]?.cancel()
         scope.launch {
             filesFor(songId).forEach { it.delete() }
             _entries.value = _entries.value.filter { it.id != songId }
@@ -189,6 +216,8 @@ class DownloadManager(
 
     /** Delete every download and reset the store. */
     fun clear() {
+        activeCalls.values.toList().forEach { it.cancel() }
+        activeJobs.values.toList().forEach { it.cancel() }
         scope.launch {
             downloadsDir.listFiles()?.forEach { it.delete() }
             _entries.value = emptyList()
@@ -205,7 +234,7 @@ class DownloadManager(
     private fun downloadToFile(song: Song, url: String, type: String?): DownloadEntry {
         val ext = when (type?.lowercase()) {
             "flac" -> "flac"
-            "mp3", "m4a", "aac", "ogg" -> type!!.lowercase()
+            "mp3", "m4a", "aac", "ogg" -> type.lowercase()
             else -> extractFromUrl(url)
         }
         val fileName = OfflineCache.fileName(song.id, ext)
@@ -219,7 +248,9 @@ class DownloadManager(
             .header("Referer", "https://music.163.com/")
             .header("Cookie", DirectNcmClient.getCookie().orEmpty())
             .build()
-        DirectNcmClient.client.newCall(request).execute().use { res ->
+        val call = DirectNcmClient.client.newCall(request)
+        activeCalls[song.id] = call
+        call.execute().use { res ->
             if (!res.isSuccessful) throw Exception("HTTP ${res.code}")
             val body = res.body ?: throw Exception("响应为空")
             val total = body.contentLength()

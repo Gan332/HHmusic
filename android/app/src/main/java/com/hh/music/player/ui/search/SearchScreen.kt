@@ -30,6 +30,7 @@ import com.hh.music.player.ui.LocalPlayerController
 import com.hh.music.player.ui.LocalStoreProvider
 import com.hh.music.player.ui.components.ArtworkImage
 import com.hh.music.player.ui.components.EmptyState
+import com.hh.music.player.ui.components.ErrorState
 import com.hh.music.player.ui.components.LoadingState
 import com.hh.music.player.ui.components.MiniPlayerBar
 import com.hh.music.player.ui.components.SongRow
@@ -116,9 +117,9 @@ fun SearchScreen(
             Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                 when {
                     state.loading -> LoadingState()
-                    state.error != null -> EmptyState(
-                        hint = "出错啦：${state.error}",
-                        icon = Icons.Filled.Search
+                    state.error != null -> ErrorState(
+                        message = state.error.orEmpty(),
+                        onRetry = actualVm::retry
                     )
                     state.query.isBlank() -> SearchSuggestionsSection(
                         history = history,
@@ -172,9 +173,9 @@ fun SearchScreen(
                     hint = "没有找到结果",
                     icon = Icons.Filled.Search
                 )
-                state.error != null -> EmptyState(
-                    hint = "出错啦：${state.error}",
-                    icon = Icons.Filled.Search
+                state.error != null -> ErrorState(
+                    message = state.error.orEmpty(),
+                    onRetry = actualVm::retry
                 )
                 else -> SearchResultsList(
                     state = state,
@@ -230,16 +231,24 @@ private fun SearchResultsList(
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
         }
-        if (state.hasMore) {
+        if (state.hasMore || state.loadMoreError != null) {
             item {
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-                    horizontalArrangement = Arrangement.Center
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    if (state.loadingMore) {
-                        CircularProgressIndicator(modifier = Modifier.size(26.dp))
-                    } else {
-                        TextButton(onClick = onLoadMore) { Text("加载更多") }
+                    when {
+                        state.loadingMore -> CircularProgressIndicator(modifier = Modifier.size(26.dp))
+                        state.loadMoreError != null -> {
+                            Text(
+                                "加载失败：${state.loadMoreError}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                            TextButton(onClick = onLoadMore) { Text("重试") }
+                        }
+                        else -> TextButton(onClick = onLoadMore) { Text("加载更多") }
                     }
                 }
             }

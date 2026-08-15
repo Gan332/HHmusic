@@ -21,6 +21,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -100,6 +101,60 @@ class SearchViewModelTest {
         slow.complete(SearchResponse(songCount = 1, songs = listOf(song("late"))))
         runCurrent()
         assertEquals(listOf("b"), vm.state.value.results.map { it.name })
+        Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `failed search can be retried successfully`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val api = FakeApi()
+        val vm = SearchViewModel(
+            MusicRepository(api, ioDispatcher = StandardTestDispatcher(testScheduler)).apply { useBackend = true }
+        )
+        var fail = true
+        api.handler = { kw, _, _ ->
+            if (fail) throw IllegalStateException("temporary failure")
+            SearchResponse(songCount = 1, songs = listOf(song(kw)))
+        }
+
+        vm.submitSearch("retry")
+        runCurrent()
+        assertTrue(vm.state.value.error != null)
+        fail = false
+        vm.retry()
+        runCurrent()
+        assertEquals(null, vm.state.value.error)
+        assertEquals(listOf("retry"), vm.state.value.results.map { it.name })
+        Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `loadMore failure is exposed and retry appends the next page`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val api = FakeApi()
+        val vm = SearchViewModel(
+            MusicRepository(api, ioDispatcher = StandardTestDispatcher(testScheduler)).apply { useBackend = true }
+        )
+        var failMore = true
+        api.handler = { kw, limit, offset ->
+            if (offset > 0 && failMore) throw IllegalStateException("page unavailable")
+            val start = offset
+            SearchResponse(
+                songCount = 45,
+                songs = (start until minOf(start + limit, 45)).map { song(kw + it) }
+            )
+        }
+
+        vm.submitSearch("pages")
+        runCurrent()
+        vm.loadMore()
+        runCurrent()
+        assertTrue(vm.state.value.loadMoreError != null)
+        failMore = false
+        vm.loadMore()
+        runCurrent()
+        assertEquals(null, vm.state.value.loadMoreError)
+        assertEquals(45, vm.state.value.results.size)
         Dispatchers.resetMain()
     }
 
