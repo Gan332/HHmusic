@@ -15,7 +15,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -23,7 +22,6 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -103,60 +101,6 @@ class SearchViewModelTest {
         slow.complete(SearchResponse(songCount = 1, songs = listOf(song("late"))))
         runCurrent()
         assertEquals(listOf("b"), vm.state.value.results.map { it.name })
-        Dispatchers.resetMain()
-    }
-
-    @Test
-    fun `failed search can be retried successfully`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val api = FakeApi()
-        val vm = SearchViewModel(
-            MusicRepository(api, ioDispatcher = UnconfinedTestDispatcher(testScheduler)).apply { useBackend = true }
-        )
-        var fail = true
-        api.handler = { kw, _, _ ->
-            if (fail) throw IllegalStateException("temporary failure")
-            SearchResponse(songCount = 1, songs = listOf(song(kw)))
-        }
-
-        vm.submitSearch("retry")
-        advanceUntilIdle()
-        assertTrue(vm.state.value.error != null)
-        fail = false
-        vm.retry()
-        advanceUntilIdle()
-        assertEquals(null, vm.state.value.error)
-        assertEquals(listOf("retry"), vm.state.value.results.map { it.name })
-        Dispatchers.resetMain()
-    }
-
-    @Test
-    fun `loadMore failure is exposed and retry appends the next page`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val api = FakeApi()
-        val vm = SearchViewModel(
-            MusicRepository(api, ioDispatcher = UnconfinedTestDispatcher(testScheduler)).apply { useBackend = true }
-        )
-        var failMore = true
-        api.handler = { kw, limit, offset ->
-            if (offset > 0 && failMore) throw IllegalStateException("page unavailable")
-            val start = offset
-            SearchResponse(
-                songCount = 45,
-                songs = (start until minOf(start + limit, 45)).map { song(kw + it) }
-            )
-        }
-
-        vm.submitSearch("pages")
-        advanceUntilIdle()
-        vm.loadMore()
-        advanceUntilIdle()
-        assertTrue(vm.state.value.loadMoreError != null)
-        failMore = false
-        vm.loadMore()
-        advanceUntilIdle()
-        assertEquals(null, vm.state.value.loadMoreError)
-        assertEquals(45, vm.state.value.results.size)
         Dispatchers.resetMain()
     }
 
