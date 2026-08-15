@@ -16,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -118,13 +119,11 @@ class SearchViewModelTest {
         }
 
         vm.submitSearch("retry")
-        runCurrent()
-        runCurrent()
+        advanceUntilIdle()
         assertTrue(vm.state.value.error != null)
         fail = false
         vm.retry()
-        runCurrent()
-        runCurrent()
+        advanceUntilIdle()
         assertEquals(null, vm.state.value.error)
         assertEquals(listOf("retry"), vm.state.value.results.map { it.name })
         Dispatchers.resetMain()
@@ -148,16 +147,13 @@ class SearchViewModelTest {
         }
 
         vm.submitSearch("pages")
-        runCurrent()
-        runCurrent()
+        advanceUntilIdle()
         vm.loadMore()
-        runCurrent()
-        runCurrent()
+        advanceUntilIdle()
         assertTrue(vm.state.value.loadMoreError != null)
         failMore = false
         vm.loadMore()
-        runCurrent()
-        runCurrent()
+        advanceUntilIdle()
         assertEquals(null, vm.state.value.loadMoreError)
         assertEquals(45, vm.state.value.results.size)
         Dispatchers.resetMain()
