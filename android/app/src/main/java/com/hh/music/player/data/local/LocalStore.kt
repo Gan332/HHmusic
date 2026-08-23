@@ -82,6 +82,9 @@ class LocalStore(private val context: Context) {
     val themeMode: Flow<String> = context.dataStore.data.map { it[themeModeKey] ?: "system" }
     private val themeColorKey = stringPreferencesKey("theme_color")
     val themeColor: Flow<String> = context.dataStore.data.map { it[themeColorKey] ?: "green" }
+    /** UI style: "classic" or "kanade" (Kanade-inspired transitions & polish). */
+    private val uiStyleKey = stringPreferencesKey("ui_style")
+    val uiStyle: Flow<String> = context.dataStore.data.map { it[uiStyleKey] ?: "classic" }
     private val dynamicColorKey = booleanPreferencesKey("dynamic_color")
     val dynamicColor: Flow<Boolean> = context.dataStore.data.map { it[dynamicColorKey] ?: true }
     private val showLyricTranslationKey = booleanPreferencesKey("show_lyric_translation")
@@ -230,6 +233,7 @@ suspend fun clearSearchHistory() {
     suspend fun setProgressStyle(value: String) { context.dataStore.edit { it[progressStyleKey] = value } }
     suspend fun setThemeMode(value: String) { context.dataStore.edit { it[themeModeKey] = value } }
     suspend fun setThemeColor(value: String) { context.dataStore.edit { it[themeColorKey] = value } }
+    suspend fun setUiStyle(value: String) { context.dataStore.edit { it[uiStyleKey] = value } }
     suspend fun setDynamicColor(value: Boolean) { context.dataStore.edit { it[dynamicColorKey] = value } }
     suspend fun setShowLyricTranslation(value: Boolean) { context.dataStore.edit { it[showLyricTranslationKey] = value } }
     suspend fun setShowLyricRomanization(value: Boolean) { context.dataStore.edit { it[showLyricRomanizationKey] = value } }

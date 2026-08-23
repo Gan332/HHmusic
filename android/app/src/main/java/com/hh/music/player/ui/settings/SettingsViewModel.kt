@@ -66,6 +66,10 @@ class SettingsViewModel(private val store: LocalStore) : ViewModel() {
         store.themeColor.map { AppThemeColor.from(it) }
             .stateIn(viewModelScope, SharingStarted.Eagerly, AppThemeColor.GREEN)
 
+    /** "classic" | "kanade" — Kanade-inspired transitions & polish. */
+    val uiStyle: StateFlow<String> =
+        store.uiStyle.stateIn(viewModelScope, SharingStarted.Eagerly, "classic")
+
     val dynamicColor: StateFlow<Boolean> =
         store.dynamicColor.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
@@ -106,6 +110,7 @@ class SettingsViewModel(private val store: LocalStore) : ViewModel() {
     fun setProgressStyle(value: String) { viewModelScope.launch { store.setProgressStyle(value) } }
     fun setThemeMode(value: String) { viewModelScope.launch { store.setThemeMode(value) } }
     fun setThemeColor(value: String) { viewModelScope.launch { store.setThemeColor(value) } }
+    fun setUiStyle(value: String) { viewModelScope.launch { store.setUiStyle(value) } }
     fun setDynamicColor(value: Boolean) { viewModelScope.launch { store.setDynamicColor(value) } }
     fun setAutoCache(value: Boolean) { viewModelScope.launch { store.setAutoCache(value) } }
     fun setCacheCapMb(value: Int) { viewModelScope.launch { store.setCacheCapMb(value) } }

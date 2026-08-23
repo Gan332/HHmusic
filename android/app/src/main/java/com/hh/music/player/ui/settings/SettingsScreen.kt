@@ -73,6 +73,7 @@ fun SettingsScreen(
     val progressStyle by vm.progressStyle.collectAsState()
     val themeMode by vm.themeMode.collectAsState()
     val themeColor by vm.themeColor.collectAsState()
+    val uiStyle by vm.uiStyle.collectAsState()
     val dynamicColor by vm.dynamicColor.collectAsState()
     val autoCache by vm.autoCache.collectAsState()
     val cacheCapMb by vm.cacheCapMb.collectAsState()
@@ -213,6 +214,32 @@ fun SettingsScreen(
                             ) { Text(mode.label) }
                         }
                     }
+                    Spacer(Modifier.height(12.dp))
+                    // 界面风格:经典 / Kanade(Kanade 式连贯转场与细节打磨)
+                    Text(
+                        "界面风格",
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        SegmentedButton(
+                            selected = uiStyle == "classic",
+                            onClick = { vm.setUiStyle("classic") },
+                            shape = SegmentedButtonDefaults.itemShape(0, 2)
+                        ) { Text("经典") }
+                        SegmentedButton(
+                            selected = uiStyle == "kanade",
+                            onClick = { vm.setUiStyle("kanade") },
+                            shape = SegmentedButtonDefaults.itemShape(1, 2)
+                        ) { Text("Kanade") }
+                    }
+                    Text(
+                        if (uiStyle == "kanade") "页面切换使用连贯的淡入滑动动画"
+                        else "使用系统默认页面切换",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
                     Spacer(Modifier.height(10.dp))
                     Row(
                         Modifier.fillMaxWidth(),

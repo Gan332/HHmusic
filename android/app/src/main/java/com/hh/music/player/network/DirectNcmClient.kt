@@ -112,9 +112,55 @@ object DirectNcmClient {
     @Volatile
     private var cookie: String? = null
 
+    /** Anonymous device session ("MUSIC_A=…"), obtained once and reused. */
+    @Volatile
+    private var anonCookie: String? = null
+
+    private val anonLock = Any()
+
     fun setCookie(value: String?) { cookie = value?.takeIf { it.isNotBlank() } }
     fun getCookie(): String? = cookie
-    private fun cookieOrEmpty(): String = cookie ?: ""
+
+    /**
+     * Cookie header for outgoing calls: a real login wins; otherwise the cached
+     * anonymous device session is used so standard-quality URLs resolve without
+     * an account (免登录播放).
+     */
+    fun cookieOrEmpty(): String {
+        cookie?.let { return it }
+        return anonCookie ?: ""
+    }
+
+    /**
+     * Register an anonymous NetEase device profile and cache its MUSIC_A cookie.
+     * Mirrors the well-known register/anonimous handshake used by community
+     * clients: an eapi POST whose Set-Cookie carries the anonymous token.
+     * Idempotent and best-effort — any failure leaves playback on the old path.
+     */
+    fun ensureAnonymousCookie() {
+        if (cookie != null || anonCookie != null) return
+        synchronized(anonLock) {
+            if (cookie != null || anonCookie != null) return
+            runCatching {
+                val url = HOST + "/eapi/register/anonimous"
+                val params = EapiCrypto.encryptParams(url, mapOf("username" to "", "password" to "", "rememberLogin" to "true"))
+                val body = FormBody.Builder().add("params", params).build()
+                val req = Request.Builder()
+                    .url(url)
+                    .post(body)
+                    .header("User-Agent", UA)
+                    .header("Referer", HOST + "/")
+                    .header("Cookie", "os=pc; appver=2.10.13")
+                    .build()
+                client.newCall(req).execute().use { res ->
+                    val musicA = res.headers("Set-Cookie").asSequence()
+                        .map { it.substringBefore(';').trim() }
+                        .firstOrNull { it.startsWith("MUSIC_A=") && it.length > "MUSIC_A=".length }
+                    if (musicA != null) anonCookie = musicA
+                }
+            }
+        }
+    }
 
     /** Parse a JSON body defensively, throwing on the known error payload. */
     fun parseJson(body: String): JSONObject {

@@ -142,6 +142,11 @@ class MusicRepository(
             if (useBackend) {
                 api.songUrl(id)
             } else {
+                // 免登录播放: no MUSIC_U → grab an anonymous device session once so
+                // standard-quality URLs resolve without an account.
+                if (!hasLoginCookie && DirectNcmClient.getCookie() == null) {
+                    DirectNcmClient.ensureAnonymousCookie()
+                }
                 val levels = linkedSetOf(audioQuality, "standard")
                 var first: JSONObject? = null
                 for (level in levels) {

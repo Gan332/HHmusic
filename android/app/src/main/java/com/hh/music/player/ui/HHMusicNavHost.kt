@@ -10,9 +10,11 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaul
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.animation.core.tween
 import kotlinx.coroutines.launch
 
 import androidx.compose.ui.Modifier
@@ -136,10 +138,41 @@ fun HHMusicNavHost(container: AppContainer) {
             navigationBarContainerColor = MaterialTheme.colorScheme.surfaceContainer
         )
     ) {
+        // "kanade" style: coherent fade+slide transitions on every route change,
+        // inspired by the Kanade client's fluid page switching. Classic keeps the
+        // platform default (no explicit transitions).
+        val uiStyle by container.localStore.uiStyle.collectAsState(initial = "classic")
+        val kanade = uiStyle == "kanade"
+        val kanadeSpec = tween<androidx.compose.ui.unit.IntOffset>(260, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+        val kanadeFade = tween<Float>(260)
         NavHost(
             navController = navController,
             startDestination = Routes.DISCOVER,
-            modifier = Modifier
+            modifier = Modifier,
+            enterTransition = {
+                if (kanade) {
+                    androidx.compose.animation.fadeIn(kanadeFade) +
+                        androidx.compose.animation.slideInHorizontally(kanadeSpec) { it / 8 }
+                } else androidx.compose.animation.EnterTransition.None
+            },
+            exitTransition = {
+                if (kanade) {
+                    androidx.compose.animation.fadeOut(kanadeFade) +
+                        androidx.compose.animation.slideOutHorizontally(kanadeSpec) { -it / 10 }
+                } else androidx.compose.animation.ExitTransition.None
+            },
+            popEnterTransition = {
+                if (kanade) {
+                    androidx.compose.animation.fadeIn(kanadeFade) +
+                        androidx.compose.animation.slideInHorizontally(kanadeSpec) { -it / 8 }
+                } else androidx.compose.animation.EnterTransition.None
+            },
+            popExitTransition = {
+                if (kanade) {
+                    androidx.compose.animation.fadeOut(kanadeFade) +
+                        androidx.compose.animation.slideOutHorizontally(kanadeSpec) { it / 10 }
+                } else androidx.compose.animation.ExitTransition.None
+            }
         ) {
                 composable(Routes.DISCOVER) {
                     val player = container.playerController
