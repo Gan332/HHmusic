@@ -163,7 +163,7 @@ class SettingsViewModel(private val store: LocalStore) : ViewModel() {
         // very next profile fetch already carries the fresh cookie.
         DirectNcmClient.setCookie("MUSIC_U=$musicU")
         store.setLoginCookie(musicU)
-        val account = runCatching { LoginClient.fetchAccount(kotlinx.coroutines.Dispatchers.IO) }.getOrNull()
+        val account = runCatching { LoginClient.fetchAccount(kotlinx.coroutines.Dispatchers.IO).getOrThrow() }.getOrNull()
         if (account != null) {
             store.setAccount(account.userId, account.nickname, account.avatarUrl)
             _loginState.value = LoginUiState.Success
@@ -188,7 +188,7 @@ class SettingsViewModel(private val store: LocalStore) : ViewModel() {
         viewModelScope.launch {
             DirectNcmClient.setCookie("MUSIC_U=$token")
             store.setLoginCookie(token)
-            val account = runCatching { LoginClient.fetchAccount(kotlinx.coroutines.Dispatchers.IO) }.getOrNull()
+            val account = runCatching { LoginClient.fetchAccount(kotlinx.coroutines.Dispatchers.IO).getOrThrow() }.getOrNull()
             if (account == null) {
                 DirectNcmClient.setCookie(null)
                 store.clearAccount()

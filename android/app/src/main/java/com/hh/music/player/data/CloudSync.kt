@@ -26,6 +26,6 @@ class CloudSync(
     /** Verify the stored MUSIC_U token is still valid; returns the profile or null. */
     suspend fun refreshAccount(): AccountInfo? {
         if (!repository.hasLoginCookie || repository.useBackend) return null
-        return runCatching { LoginClient.fetchAccount(repository.ioDispatcher) }.getOrNull()
+        return runCatching { LoginClient.fetchAccount(repository.ioDispatcher).getOrThrow() }.getOrNull()
     }
 }

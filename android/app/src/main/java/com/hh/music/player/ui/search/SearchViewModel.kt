@@ -26,7 +26,7 @@ data class SearchState(
     val loadingMore: Boolean = false,
     val loadMoreError: String? = null,
     val artists: List<Artist> = emptyList(),
-    val hotSearches: List<String> = DEFAULT_HOT_SEARCHES
+    val hotSearches: List<String> = SearchViewModel.DEFAULT_HOT_SEARCHES
 ) {
     val hasMore: Boolean get() = results.isNotEmpty() && results.size < total
 }

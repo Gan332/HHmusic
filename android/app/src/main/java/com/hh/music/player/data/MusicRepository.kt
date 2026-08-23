@@ -47,7 +47,8 @@ class MusicRepository(
     // Small in-memory LRU caches: lyrics are re-opened every time you re-visit the
     // player screen, and search results are re-fetched on every keystroke debounce.
     private val lyricCache = LruCache<Long, Lyric>(30)
-    private val searchCache = LruCache<SearchCacheKey, SearchPage>(30)    private val plazaCache = LruCache<PlazaCacheKey, PlaylistPlazaPage>(20)
+    private val searchCache = LruCache<SearchCacheKey, SearchPage>(30)
+    private val plazaCache = LruCache<PlazaCacheKey, PlaylistPlazaPage>(20)
     // ---------------- direct (NetEase) implementations ----------------
 
     suspend fun search(keyword: String, limit: Int = 30, offset: Int = 0): Result<SearchPage> =
@@ -429,11 +430,11 @@ class AppContainer(context: Context) {
     val equalizerController: EqualizerController = EqualizerController(localStore)
     val playerController: PlayerController =
         PlayerController(context.applicationContext, repository, localStore, downloadManager)
+    // Application scope for settings collection; declared before its first user.
+    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
     val cloudSync: CloudSync = CloudSync(repository, scope)
 
     // Keep the repository runtime flags in sync with persisted user settings.
-    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
-
     companion object {
         /**
          * Process-wide handle so [PlaybackService] (a separate Android component)

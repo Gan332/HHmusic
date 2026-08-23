@@ -1,0 +1,44 @@
+{
+  "fontUrl": "/plugins/dsh-fonts/fonts/",
+  "presets": [
+    {
+      "id": "system",
+      "ui": ["-apple-system", "BlinkMacSystemFont", "'Segoe UI'", "'PingFang SC'", "'Hiragino Sans GB'", "'Microsoft YaHei'", "'Helvetica Neue'", "Helvetica", "Arial", "sans-serif"],
+      "code": ["'SF Mono'", "'JetBrains Mono'", "'Fira Code'", "Consolas", "'Liberation Mono'", "Menlo", "Courier", "'PingFang SC'", "'Microsoft YaHei'"],
+      "faces": []
+    },
+    {
+      "id": "jetbrains-inter",
+      "ui": ["Inter", "-apple-system", "BlinkMacSystemFont", "'Segoe UI'", "'PingFang SC'", "'Hiragino Sans GB'", "'Microsoft YaHei'", "sans-serif"],
+      "code": ["'JetBrains Mono'", "'SF Mono'", "Consolas", "'PingFang SC'", "'Microsoft YaHei'", "monospace"],
+      "faces": [
+        { "family": "Inter", "weight": "400", "file": "inter-latin-400-normal.woff2" },
+        { "family": "Inter", "weight": "600", "file": "inter-latin-600-normal.woff2" },
+        { "family": "Inter", "weight": "700", "file": "inter-latin-700-normal.woff2" },
+        { "family": "JetBrains Mono", "weight": "400", "file": "jetbrains-mono-latin-400-normal.woff2" },
+        { "family": "JetBrains Mono", "weight": "700", "file": "jetbrains-mono-latin-700-normal.woff2" }
+      ]
+    },
+    {
+      "id": "fira-plex",
+      "ui": ["'IBM Plex Sans'", "-apple-system", "BlinkMacSystemFont", "'Segoe UI'", "'PingFang SC'", "'Hiragino Sans GB'", "'Microsoft YaHei'", "sans-serif"],
+      "code": ["'Fira Code'", "'SF Mono'", "Consolas", "'PingFang SC'", "'Microsoft YaHei'", "monospace"],
+      "faces": [
+        { "family": "IBM Plex Sans", "weight": "400", "file": "ibm-plex-sans-latin-400-normal.woff2" },
+        { "family": "IBM Plex Sans", "weight": "600", "file": "ibm-plex-sans-latin-600-normal.woff2" },
+        { "family": "IBM Plex Sans", "weight": "700", "file": "ibm-plex-sans-latin-700-normal.woff2" },
+        { "family": "Fira Code", "weight": "400", "file": "fira-code-latin-400-normal.woff2" },
+        { "family": "Fira Code", "weight": "700", "file": "fira-code-latin-700-normal.woff2" }
+      ]
+    },
+    {
+      "id": "cascadia",
+      "ui": ["-apple-system", "BlinkMacSystemFont", "'Segoe UI'", "'PingFang SC'", "'Hiragino Sans GB'", "'Microsoft YaHei'", "sans-serif"],
+      "code": ["'Cascadia Code'", "'SF Mono'", "Consolas", "'PingFang SC'", "'Microsoft YaHei'", "monospace"],
+      "faces": [
+        { "family": "Cascadia Code", "weight": "400", "file": "cascadia-code-latin-400-normal.woff2" },
+        { "family": "Cascadia Code", "weight": "700", "file": "cascadia-code-latin-700-normal.woff2" }
+      ]
+    }
+  ]
+}
