@@ -171,60 +171,6 @@ fun SettingsScreen(
                 }
             }
 
-            // ---- 数据源 ----
-            SectionLabel("数据源")
-            ElevatedCard(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            Modifier.size(40.dp).clip(MaterialTheme.shapes.medium)
-                                .background(MaterialTheme.colorScheme.secondaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                if (useBackend) Icons.Filled.Cloud else Icons.Filled.CloudOff,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text("数据通道", fontWeight = FontWeight.Medium)
-                            Text(
-                                "直连无需后端；代理需本地运行 server/",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(14.dp))
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        SegmentedButton(
-                            selected = !useBackend,
-                            onClick = { vm.setUseBackend(false) },
-                            shape = SegmentedButtonDefaults.itemShape(0, 2)
-                        ) {
-                            Text("直连网易云")
-                        }
-                        SegmentedButton(
-                            selected = useBackend,
-                            onClick = { vm.setUseBackend(true) },
-                            shape = SegmentedButtonDefaults.itemShape(1, 2)
-                        ) {
-                            Text("本地后端")
-                        }
-                    }
-                    if (useBackend) {
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "已切换到后端模式，请确保 server/ 在运行且 NetworkModule.BASE_URL 可达。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-            }
-
             // ---- 外观 ----
             Spacer(Modifier.height(8.dp))
             SectionLabel("外观")
@@ -361,6 +307,46 @@ fun SettingsScreen(
                             )
                         }
                     }
+
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider()
+                    Spacer(Modifier.height(14.dp))
+
+                    // 子项：进度条样式（并入「播放」，减少碎片卡片）
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(40.dp).clip(MaterialTheme.shapes.medium)
+                                .background(MaterialTheme.colorScheme.secondaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Filled.ShowChart,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text("进度条样式", fontWeight = FontWeight.Medium)
+                            Text(
+                                "滑块可拖动，线性/环形为 M3E 进度指示器",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        ProgressStyle.entries.forEachIndexed { index, style ->
+                            SegmentedButton(
+                                selected = progressStyle == style.key,
+                                onClick = { vm.setProgressStyle(style.key) },
+                                shape = SegmentedButtonDefaults.itemShape(index, ProgressStyle.entries.size)
+                            ) {
+                                Text(style.label)
+                            }
+                        }
+                    }
                 }
             }
 
@@ -452,48 +438,6 @@ fun SettingsScreen(
                 }
             }
 
-            // ---- 进度条样式 ----
-            Spacer(Modifier.height(8.dp))
-            SectionLabel("播放进度条")
-            ElevatedCard(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            Modifier.size(40.dp).clip(MaterialTheme.shapes.medium)
-                                .background(MaterialTheme.colorScheme.secondaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Filled.ShowChart,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text("进度条样式", fontWeight = FontWeight.Medium)
-                            Text(
-                                "滑块可拖动，线性/环形为 M3E 进度指示器",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(14.dp))
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        ProgressStyle.entries.forEachIndexed { index, style ->
-                            SegmentedButton(
-                                selected = progressStyle == style.key,
-                                onClick = { vm.setProgressStyle(style.key) },
-                                shape = SegmentedButtonDefaults.itemShape(index, ProgressStyle.entries.size)
-                            ) {
-                                Text(style.label)
-                            }
-                        }
-                    }
-                }
-            }
-
             // ---- 离线缓存 ----
             Spacer(Modifier.height(8.dp))
             SectionLabel("离线缓存")
@@ -548,6 +492,61 @@ fun SettingsScreen(
                             "当前上限 ${cacheCapMb}MB",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            // ---- 高级 · 数据源 ----
+            Spacer(Modifier.height(8.dp))
+            SectionLabel("高级")
+            ElevatedCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(40.dp).clip(MaterialTheme.shapes.medium)
+                                .background(MaterialTheme.colorScheme.secondaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                if (useBackend) Icons.Filled.Cloud else Icons.Filled.CloudOff,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("数据通道", fontWeight = FontWeight.Medium)
+                            Text(
+                                "直连无需后端；代理需本地运行 server/",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        SegmentedButton(
+                            selected = !useBackend,
+                            onClick = { vm.setUseBackend(false) },
+                            shape = SegmentedButtonDefaults.itemShape(0, 2)
+                        ) {
+                            Text("直连网易云")
+                        }
+                        SegmentedButton(
+                            selected = useBackend,
+                            onClick = { vm.setUseBackend(true) },
+                            shape = SegmentedButtonDefaults.itemShape(1, 2)
+                        ) {
+                            Text("本地后端")
+                        }
+                    }
+                    if (useBackend) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "已切换到后端模式，请确保 server/ 在运行且 NetworkModule.BASE_URL 可达。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
                         )
                     }
                 }

@@ -216,10 +216,28 @@ private fun SearchResultsList(
         state = listState,
         modifier = Modifier.fillMaxSize()
     ) {
+        // Section 1: artists — a horizontal strip keeps songs dominant.
         if (artists.isNotEmpty()) {
+            item(key = "artists-header") {
+                Text(
+                    "歌手",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp)
+                )
+            }
             item(key = "artists") {
                 ArtistSearchSection(artists = artists, onOpen = onOpenArtist)
             }
+        }
+        // Section 2: songs.
+        item(key = "songs-header") {
+            Text(
+                "歌曲",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp)
+            )
         }
         itemsIndexed(state.results) { index, song ->
             SongRow(
@@ -257,30 +275,29 @@ private fun SearchResultsList(
     }
 }
 
+/** Horizontal strip of artist avatars — compact, M3E-shaped section. */
 @Composable
 private fun ArtistSearchSection(
     artists: List<Artist>,
     onOpen: (Artist) -> Unit
 ) {
-    Column(Modifier.fillMaxWidth()) {
-        Text(
-            "歌手",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-        artists.forEach { artist ->
-            Row(
+    androidx.compose.foundation.lazy.LazyRow(
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        items(artists.size) { index ->
+            val artist = artists[index]
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .width(72.dp)
                     .clickable { onOpen(artist) }
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     Modifier
-                        .size(48.dp)
-                        .clip(MaterialTheme.shapes.medium)
+                        .size(64.dp)
+                        .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                     contentAlignment = Alignment.Center
                 ) {
@@ -288,38 +305,28 @@ private fun ArtistSearchSection(
                         Icon(
                             Icons.Filled.Person,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(28.dp)
                         )
                     } else {
                         ArtworkImage(
                             url = artist.picUrl,
-                            contentDescription = null,
+                            contentDescription = artist.name,
                             modifier = Modifier.fillMaxSize()
                         )
                     }
                 }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        artist.name.ifBlank { "未知歌手" },
-                        style = MaterialTheme.typography.bodyLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        "查看热门歌曲",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    artist.name.ifBlank { "未知歌手" },
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
         }
     }
 }

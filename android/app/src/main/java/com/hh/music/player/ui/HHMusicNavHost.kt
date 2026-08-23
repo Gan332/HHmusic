@@ -114,7 +114,11 @@ fun HHMusicNavHost(container: AppContainer) {
                 item(
                     selected = currentRoute == tab.route,
                     onClick = {
-                        navController.navigate(tab.route) {
+                        // SEARCH's route pattern carries "{keyword}"; navigating the raw
+                        // pattern would fill the arg with that literal text. Always go
+                        // through Routes.search() so the query starts empty.
+                        val route = if (tab.route == Routes.SEARCH) Routes.search() else tab.route
+                        navController.navigate(route) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true
                             restoreState = true

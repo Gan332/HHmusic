@@ -328,8 +328,13 @@ fun PlayerScreen(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Each control sits in an equal-width, centered slot so the row never drifts.
-                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                // Symmetric wings put the play button at the exact horizontal
+                // center: [mode, prev] — play — [next, queue].
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     TooltipBox(
                         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                         tooltip = { PlainTooltip { Text(playModeDesc) } },
@@ -339,8 +344,7 @@ fun PlayerScreen(
                             Icon(playModeIcon, contentDescription = playModeDesc, tint = MaterialTheme.colorScheme.primary)
                         }
                     }
-                }
-                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    Spacer(Modifier.width(10.dp))
                     TooltipBox(
                         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                         tooltip = { PlainTooltip { Text("上一首") } },
@@ -351,14 +355,18 @@ fun PlayerScreen(
                         }
                     }
                 }
-                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                Box(Modifier.padding(horizontal = 20.dp)) {
                     CircularPlayButton(
                         player = player,
                         isPlaying = isPlaying,
                         style = progressStyle
                     )
                 }
-                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.Start,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     TooltipBox(
                         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                         tooltip = { PlainTooltip { Text("下一首") } },
@@ -366,6 +374,16 @@ fun PlayerScreen(
                     ) {
                         FilledTonalIconButton(onClick = { player.playNext() }, modifier = Modifier.size(52.dp)) {
                             Icon(Icons.Filled.SkipNext, contentDescription = "下一首", modifier = Modifier.size(28.dp))
+                        }
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    TooltipBox(
+                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                        tooltip = { PlainTooltip { Text("播放队列") } },
+                        state = rememberTooltipState()
+                    ) {
+                        IconButton(onClick = { showQueue = true }) {
+                            Icon(Icons.Filled.QueueMusic, contentDescription = "播放队列")
                         }
                     }
                 }

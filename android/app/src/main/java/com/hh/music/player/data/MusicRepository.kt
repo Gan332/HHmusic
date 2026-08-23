@@ -132,20 +132,30 @@ class MusicRepository(
      * Resolve a playable URL. Uses eapi for the official V1 endpoint and, if no
      * link is returned (common without a login cookie), falls back to the
      * public "outer url" — exactly Ncrust's strategy.
+     *
+     * Anonymous requests are frequently denied anything above standard quality,
+     * so when the configured level yields no URL we retry once at "standard"
+     * before giving up — this alone recovers playback for most logged-out users.
      */
     suspend fun songUrl(id: Long): Result<SongUrl> = runCatching {
         withContext(ioDispatcher) {
             if (useBackend) {
                 api.songUrl(id)
             } else {
-                val payload = mapOf<String, Any>(
-                    "ids" to JSONArray().put(id).toString(),
-                    "level" to audioQuality,
-                    "encodeType" to "flac"
-                )
-                val body = DirectNcmClient.eapiPost("song/enhance/player/url/v1", payload)
-                val dataArr = JSONObject(body).optJSONArray("data")
-                val first = dataArr?.optJSONObject(0)
+                val levels = linkedSetOf(audioQuality, "standard")
+                var first: JSONObject? = null
+                for (level in levels) {
+                    val payload = mapOf<String, Any>(
+                        "ids" to JSONArray().put(id).toString(),
+                        "level" to level,
+                        "encodeType" to "flac"
+                    )
+                    val body = DirectNcmClient.eapiPost("song/enhance/player/url/v1", payload)
+                    first = JSONObject(body).optJSONArray("data")?.optJSONObject(0)
+                    val candidate = first?.optString("url", "")
+                    if (!candidate.isNullOrEmpty()) break
+                    first = null
+                }
                 val url = first?.optString("url", "") ?: ""
                 SongUrl(
                     id = id,
