@@ -13,6 +13,7 @@ import com.hh.music.player.network.LikeBody
 import com.hh.music.player.network.LikeResponse
 import com.hh.music.player.network.RecommendPlaylistResponse
 import com.hh.music.player.data.SongUrl
+import com.hh.music.player.data.SongDetailResponse
 import com.hh.music.player.network.ToplistResponse
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -60,6 +61,11 @@ class SearchViewModelTest {
         override suspend fun albumDetail(id: Long): AlbumDetail = throw UnsupportedOperationException()
         override suspend fun hotSearch(): HotSearchResponse = HotSearchResponse()
         override suspend fun newSongs(limit: Int) = throw UnsupportedOperationException()
+        override suspend fun playlistCatlist(): com.hh.music.player.network.PlaylistCatlistResponse =
+            throw UnsupportedOperationException()
+        override suspend fun topPlaylists(cat: String, limit: Int, offset: Int, order: String): com.hh.music.player.network.TopPlaylistResponse =
+            throw UnsupportedOperationException()
+        override suspend fun personalFm(): SongDetailResponse = throw UnsupportedOperationException()
     }
 
     private fun song(name: String) = Song(id = name.hashCode().toLong(), name = name)

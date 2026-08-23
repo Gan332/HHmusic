@@ -41,6 +41,11 @@ class MusicRepositoryUrlTest {
         override suspend fun hotSearch(): com.hh.music.player.network.HotSearchResponse =
             throw UnsupportedOperationException()
         override suspend fun newSongs(limit: Int): SongDetailResponse = throw UnsupportedOperationException()
+        override suspend fun playlistCatlist(): com.hh.music.player.network.PlaylistCatlistResponse =
+            throw UnsupportedOperationException()
+        override suspend fun topPlaylists(cat: String, limit: Int, offset: Int, order: String): com.hh.music.player.network.TopPlaylistResponse =
+            throw UnsupportedOperationException()
+        override suspend fun personalFm(): SongDetailResponse = throw UnsupportedOperationException()
     }
 
     @Test

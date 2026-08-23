@@ -1,5 +1,7 @@
 package com.hh.music.player.ui.artist
 
+import com.hh.music.player.data.AlbumItem
+import com.hh.music.player.data.ArtistAlbumsPage
 import com.hh.music.player.data.ArtistSongsPage
 import com.hh.music.player.data.Song
 import kotlinx.coroutines.Dispatchers
