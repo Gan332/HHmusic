@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,8 +38,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.hh.music.player.data.CloudSync
+import com.hh.music.player.data.MusicRepository
 import com.hh.music.player.data.SavedPlaylist
 import com.hh.music.player.data.Song
+import com.hh.music.player.data.UserPlaylist
 import com.hh.music.player.data.local.LocalMusic
 import com.hh.music.player.data.local.LocalStore
 import com.hh.music.player.data.offline.DownloadEntry
@@ -50,6 +55,8 @@ import com.hh.music.player.ui.LocalStoreProvider
 import com.hh.music.player.ui.LocalDownloadManager
 import com.hh.music.player.ui.components.ArtworkImage
 import com.hh.music.player.ui.components.EmptyState
+import com.hh.music.player.ui.components.ErrorState
+import com.hh.music.player.ui.components.LoadingState
 import com.hh.music.player.ui.components.MiniPlayerBar
 import com.hh.music.player.ui.components.SongActionsSheet
 import com.hh.music.player.ui.components.SongRow
@@ -76,8 +83,11 @@ fun LibraryScreen(
     onOpenPlaylist: (Long) -> Unit,
     onOpenPlayer: () -> Unit,
     onOpenDiscover: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    repository: MusicRepository? = null,
+    cloudSync: CloudSync? = null,
     store: LocalStore = LocalStoreProvider.current,
-    vm: LibraryViewModel = viewModel { LibraryViewModel(store) }
+    vm: LibraryViewModel = viewModel { LibraryViewModel(store, repository, cloudSync) }
 ) {
     val favorites by vm.favorites.collectAsState()
     val recent by vm.recent.collectAsState()
@@ -227,12 +237,51 @@ fun LibraryScreen(
                         )
                     }
                 }
-                LibraryTab.PLAYLISTS -> PlaylistPane(
-                    playlists = savedPlaylists,
-                    emptyHint = "还没有收藏的歌单",
-                    onOpen = onOpenPlaylist,
-                    onRemove = { vm.removeSavedPlaylist(it.id) }
-                )
+                LibraryTab.PLAYLISTS -> {
+                    // v1.8: 本地收藏歌单 / 网易云歌单双源切换。
+                    var cloudMode by remember { mutableStateOf(false) }
+                    val cloudState by vm.cloudPlaylists.collectAsState()
+                    val loggedIn by vm.isLoggedIn.collectAsState()
+                    Column(Modifier.fillMaxSize()) {
+                        Row(
+                            Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            FilterChip(
+                                selected = !cloudMode,
+                                onClick = { cloudMode = false },
+                                label = { Text("本地收藏") }
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            FilterChip(
+                                selected = cloudMode,
+                                onClick = {
+                                    cloudMode = true
+                                    if (loggedIn && cloudState is CloudPlaylistsState.Idle) {
+                                        vm.refreshCloudPlaylists()
+                                    }
+                                },
+                                label = { Text("网易云") }
+                            )
+                        }
+                        if (!cloudMode) {
+                            PlaylistPane(
+                                playlists = savedPlaylists,
+                                emptyHint = "还没有收藏的歌单",
+                                onOpen = onOpenPlaylist,
+                                onRemove = { vm.removeSavedPlaylist(it.id) }
+                            )
+                        } else {
+                            CloudPlaylistPane(
+                                state = cloudState,
+                                loggedIn = loggedIn,
+                                onOpen = onOpenPlaylist,
+                                onRetry = { vm.refreshCloudPlaylists() },
+                                onOpenSettings = onOpenSettings
+                            )
+                        }
+                    }
+                }
                 LibraryTab.LOCAL -> LocalMusicPane(
                     store = store,
                     player = player,
@@ -578,6 +627,64 @@ private fun PlaylistPane(
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
         }
         item { Spacer(Modifier.height(72.dp)) }
+    }
+}
+
+/** v1.8: 网易云歌单面板 — 登录引导 / 加载 / 错误重试 / 云端列表。 */
+@Composable
+private fun CloudPlaylistPane(
+    state: CloudPlaylistsState,
+    loggedIn: Boolean,
+    onOpen: (Long) -> Unit,
+    onRetry: () -> Unit,
+    onOpenSettings: () -> Unit
+) {
+    when {
+        !loggedIn -> EmptyState(
+            hint = "登录网易云账号后可查看我的云歌单",
+            icon = Icons.Filled.Cloud,
+            actionText = "去登录",
+            onAction = onOpenSettings
+        )
+        state is CloudPlaylistsState.Loading -> LoadingState()
+        state is CloudPlaylistsState.Error -> ErrorState(state.message, onRetry)
+        state is CloudPlaylistsState.Done -> LazyColumn(Modifier.fillMaxSize()) {
+            itemsIndexed(state.playlists) { _, pl ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { onOpen(pl.id) }.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ArtworkImage(
+                        url = pl.coverImgUrl.orEmpty(),
+                        contentDescription = null,
+                        modifier = Modifier.size(56.dp).clip(MaterialTheme.shapes.medium)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            pl.name.ifBlank { "未命名歌单" },
+                            style = MaterialTheme.typography.bodyLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            if (pl.isLikedSongs) "我喜欢的音乐" else "云端歌单 · ${pl.trackCount} 首",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            }
+            item { Spacer(Modifier.height(72.dp)) }
+        }
+        else -> EmptyState(hint = "切换到网易云查看云端歌单", icon = Icons.Filled.Cloud)
     }
 }
 

@@ -149,6 +149,17 @@ class LocalStore(private val context: Context) {
         }
     }
 
+    /** v1.8: bulk-insert songs at the front of favorites, skipping ids already present. */
+    suspend fun addFavorites(songs: List<Song>) {
+        if (songs.isEmpty()) return
+        context.dataStore.edit { p ->
+            val cur = p[favoritesKey]?.let { decode(it) } ?: emptyList()
+            val known = cur.mapTo(HashSet()) { it.id }
+            val merged = songs.asSequence().filter { it.id !in known }.toList() + cur
+            p[favoritesKey] = encode(merged)
+        }
+    }
+
     suspend fun addRecent(song: Song) {
         context.dataStore.edit { p ->
             val cur = p[recentKey]?.let { decode(it) } ?: emptyList()

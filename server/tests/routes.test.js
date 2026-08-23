@@ -261,6 +261,88 @@ describe("artist albums & album detail routes", () => {
   });
 });
 
+describe("user playlists & subscribe routes", () => {
+  test("user playlists normalizes rows and passes specialType through", async () => {
+    await withServer(
+      makeApp({
+        getUserPlaylists: async () =>
+          ok({
+            playlist: [
+              {
+                id: 111,
+                name: "我喜欢的音乐",
+                coverImgUrl: "https://p.music.163.com/liked.jpg",
+                trackCount: 42,
+                specialType: 5,
+                creator: { userId: 9, nickname: "我" },
+              },
+              { id: 222, name: "歌单2", trackCount: 0, creator: null },
+            ],
+          }),
+      }),
+      async (base) => {
+        const { status, body } = await getJson(base, "/api/user/playlists?uid=9");
+        assert.equal(status, 200);
+        assert.deepEqual(body.playlists, [
+          {
+            id: 111,
+            name: "我喜欢的音乐",
+            coverImgUrl: "https://p.music.163.com/liked.jpg",
+            trackCount: 42,
+            creator: { id: 9, nickname: "我" },
+            specialType: 5,
+          },
+          {
+            id: 222,
+            name: "歌单2",
+            coverImgUrl: null,
+            trackCount: 0,
+            creator: null,
+            specialType: 0,
+          },
+        ]);
+      }
+    );
+  });
+
+  test("user playlists missing uid -> 400", async () => {
+    await withServer(makeApp(), async (base) => {
+      const { status } = await getJson(base, "/api/user/playlists");
+      assert.equal(status, 400);
+    });
+  });
+
+  test("subscribe requires id and t in {1,2}", async () => {
+    await withServer(
+      makeApp({
+        subscribePlaylist: async (id, t) => ok({ code: 200, id, t }),
+      }),
+      async (base) => {
+        const missing = await postJson(base, "/api/playlist/subscribe", {});
+        assert.equal(missing.status, 400);
+
+        const badT = await postJson(base, "/api/playlist/subscribe", { id: 5, t: 7 });
+        assert.equal(badT.status, 400);
+
+        const okSub = await postJson(base, "/api/playlist/subscribe", { id: 5, t: 1 });
+        assert.equal(okSub.status, 200);
+        assert.equal(okSub.body.code, 200);
+        assert.equal(okSub.body.id, 5);
+        assert.equal(okSub.body.t, 1);
+      }
+    );
+  });
+
+  test("subscribe falls back to real upstream when not stubbed (validation first)", async () => {
+    // No stub -> real netease wrapper wired; validation must reject before any call.
+    const app = createApp({});
+    await withServer(app, async (base) => {
+      const { status } = await postJson(base, "/api/playlist/subscribe", {});
+      assert.equal(status, 400);
+    });
+  });
+});
+
 describe("song url (VIP / copyright responses)", () => {
   test("upstream returning null url stays 200 with url:null", async () => {
     await withServer(makeApp(), async (base) => {

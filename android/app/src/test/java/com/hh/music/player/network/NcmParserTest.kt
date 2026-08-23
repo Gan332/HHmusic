@@ -148,4 +148,67 @@ class NcmParserTest {
         assertEquals(1, detail.songs.size)
         assertEquals("以父之名", detail.songs[0].name)
     }
+
+    @Test
+    fun `user playlists normalizes rows and flags the liked-songs list`() {
+        val root = JSONObject(
+            """
+            {
+              "code": 200,
+              "playlist": [
+                {
+                  "id": 111,
+                  "name": "我喜欢的音乐",
+                  "coverImgUrl": "https://p.music.163.com/liked.jpg",
+                  "trackCount": 42,
+                  "specialType": 5,
+                  "creator": {"userId": 9, "nickname": "我"}
+                },
+                {
+                  "id": 222,
+                  "name": "歌单2",
+                  "coverImgUrl": null,
+                  "creator": {"userId": 9, "nickname": "我"}
+                },
+                {"id": 0, "name": "无效项应被丢弃"},
+                {"name": "没有 id 也丢弃"}
+              ]
+            }
+            """.trimIndent()
+        )
+
+        val rows = NcmParser.userPlaylists(root)
+
+        assertEquals(2, rows.size)
+        assertEquals(111, rows[0].id)
+        assertEquals("我喜欢的音乐", rows[0].name)
+        assertTrue(rows[0].isLikedSongs)
+        assertEquals(9, rows[0].creator?.id)
+        assertEquals("我", rows[0].creator?.nickname)
+        assertEquals(222, rows[1].id)
+        assertEquals(null, rows[1].coverImgUrl)
+        // specialType absent -> 0 -> not the liked-songs list.
+        assertTrue(!rows[1].isLikedSongs)
+    }
+
+    @Test
+    fun `user playlists tolerates missing playlist array and blank covers`() {
+        assertTrue(NcmParser.userPlaylists(JSONObject("{\"code\":200}")).isEmpty())
+        // Empty object: no playlist array at all.
+        assertTrue(NcmParser.userPlaylists(JSONObject()).isEmpty())
+
+        val weird = NcmParser.userPlaylists(
+            JSONObject(
+                """
+                {"playlist": [
+                  {"id": 7, "name": "n", "coverImgUrl": ""},
+                  {"id": 8, "name": "m", "coverImgUrl": "null"}
+                ]}
+                """.trimIndent()
+            )
+        )
+        assertEquals(2, weird.size)
+        assertEquals(null, weird[0].coverImgUrl)
+        assertEquals(null, weird[1].coverImgUrl)
+    }
 }

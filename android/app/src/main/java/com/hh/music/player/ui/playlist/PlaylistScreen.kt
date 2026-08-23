@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.hh.music.player.data.CloudSync
 import com.hh.music.player.data.MusicRepository
 import com.hh.music.player.data.SavedPlaylist
 import com.hh.music.player.ui.LocalPlayerController
@@ -39,6 +40,7 @@ fun PlaylistScreen(
     repository: MusicRepository,
     onBack: () -> Unit,
     onOpenPlayer: () -> Unit,
+    cloudSync: CloudSync? = null,
     vm: PlaylistViewModel = viewModel { PlaylistViewModel(repository) }
 ) {
     val state by vm.state.collectAsState()
@@ -88,6 +90,7 @@ fun PlaylistScreen(
                     ) {
                         IconButton(onClick = {
                             val p = playlist ?: return@IconButton
+                            // Local first (source of truth); cloud subscribe is best-effort.
                             scope.launch {
                                 store.toggleSavedPlaylist(
                                     SavedPlaylist(
@@ -98,6 +101,7 @@ fun PlaylistScreen(
                                     )
                                 )
                             }
+                            cloudSync?.pushPlaylistSubscribe(p.id, !isSaved)
                         }) {
                             Icon(
                                 if (isSaved) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,

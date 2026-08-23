@@ -216,7 +216,10 @@ fun HHMusicNavHost(container: AppContainer) {
                                 launchSingleTop = true
                                 restoreState = true
                             }
-                        }
+                        },
+                        onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                        repository = container.repository,
+                        cloudSync = container.cloudSync
                     )
                 }
                 composable(Routes.SETTINGS) {
@@ -231,7 +234,8 @@ fun HHMusicNavHost(container: AppContainer) {
                         playlistId = id,
                         repository = container.repository,
                         onBack = { navController.popBackStack() },
-                        onOpenPlayer = { navController.navigate(Routes.PLAYER) }
+                        onOpenPlayer = { navController.navigate(Routes.PLAYER) },
+                        cloudSync = container.cloudSync
                     )
                 }
                 composable(Routes.ALBUM) { backStackEntry ->

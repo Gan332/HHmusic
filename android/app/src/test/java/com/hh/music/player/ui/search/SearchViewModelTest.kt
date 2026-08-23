@@ -66,6 +66,10 @@ class SearchViewModelTest {
         override suspend fun topPlaylists(cat: String, limit: Int, offset: Int, order: String): com.hh.music.player.network.TopPlaylistResponse =
             throw UnsupportedOperationException()
         override suspend fun personalFm(): SongDetailResponse = throw UnsupportedOperationException()
+        override suspend fun userPlaylists(uid: Long, limit: Int, offset: Int): com.hh.music.player.network.UserPlaylistsResponse =
+            throw UnsupportedOperationException()
+        override suspend fun subscribePlaylist(body: com.hh.music.player.network.SubscribeBody): com.hh.music.player.network.SubscribeResponse =
+            throw UnsupportedOperationException()
     }
 
     private fun song(name: String) = Song(id = name.hashCode().toLong(), name = name)
