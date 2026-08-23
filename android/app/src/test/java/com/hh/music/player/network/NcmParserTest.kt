@@ -180,12 +180,12 @@ class NcmParserTest {
         val rows = NcmParser.userPlaylists(root)
 
         assertEquals(2, rows.size)
-        assertEquals(111, rows[0].id)
+        assertEquals(111L, rows[0].id)
         assertEquals("我喜欢的音乐", rows[0].name)
         assertTrue(rows[0].isLikedSongs)
-        assertEquals(9, rows[0].creator?.id)
+        assertEquals(9L, rows[0].creator?.id)
         assertEquals("我", rows[0].creator?.nickname)
-        assertEquals(222, rows[1].id)
+        assertEquals(222L, rows[1].id)
         assertEquals(null, rows[1].coverImgUrl)
         // specialType absent -> 0 -> not the liked-songs list.
         assertTrue(!rows[1].isLikedSongs)
