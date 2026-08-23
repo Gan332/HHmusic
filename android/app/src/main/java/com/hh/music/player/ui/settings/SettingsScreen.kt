@@ -1,18 +1,26 @@
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package com.hh.music.player.ui.settings
 
+import android.graphics.Bitmap
 import android.os.Build
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.Translate
@@ -21,12 +29,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.qrcode.QRCodeWriter
 import com.hh.music.player.BuildConfig
 import com.hh.music.player.data.local.LocalStore
 import com.hh.music.player.ui.ProgressStyle
+import com.hh.music.player.ui.components.ArtworkImage
 import com.hh.music.player.ui.theme.AppThemeColor
 import com.hh.music.player.ui.theme.AppThemeMode
 import com.hh.music.player.ui.theme.LyricFontScale
@@ -65,8 +79,13 @@ fun SettingsScreen(
     val showLyricTranslation by vm.showLyricTranslation.collectAsState()
     val showLyricRomanization by vm.showLyricRomanization.collectAsState()
     val lyricFontScale by vm.lyricFontScale.collectAsState()
+    val userId by vm.userId.collectAsState()
+    val nickname by vm.nickname.collectAsState()
+    val avatarUrl by vm.avatarUrl.collectAsState()
+    val loginState by vm.loginState.collectAsState()
     val dynamicColorSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val dynamicColorActive = dynamicColorSupported && dynamicColor
+    var showLoginDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -89,6 +108,69 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // ---- 账号 ----
+            SectionLabel("账号")
+            ElevatedCard(Modifier.fillMaxWidth()) {
+                if (userId > 0) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (avatarUrl.isNotBlank()) {
+                            ArtworkImage(
+                                url = avatarUrl,
+                                contentDescription = null,
+                                modifier = Modifier.size(44.dp).clip(CircleShape)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text(nickname.ifBlank { "已登录" }, fontWeight = FontWeight.Medium)
+                            Text(
+                                "收藏操作将同步到云端",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        TextButton(onClick = { vm.logout() }) { Text("退出登录") }
+                    }
+                } else {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { showLoginDialog = true }
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            Modifier.size(40.dp).clip(MaterialTheme.shapes.medium)
+                                .background(MaterialTheme.colorScheme.secondaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Filled.Person,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("登录网易云音乐", fontWeight = FontWeight.Medium)
+                            Text(
+                                "扫码登录后可云收藏同步、解锁会员音源",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
             // ---- 数据源 ----
             SectionLabel("数据源")
             ElevatedCard(Modifier.fillMaxWidth()) {
@@ -490,6 +572,142 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+
+    if (showLoginDialog) {
+        LoginDialog(
+            vm = vm,
+            loginState = loginState,
+            useBackend = useBackend,
+            onDismiss = {
+                vm.cancelLogin()
+                showLoginDialog = false
+            },
+            onSuccess = { showLoginDialog = false }
+        )
+    }
+}
+
+@Composable
+private fun LoginDialog(
+    vm: SettingsViewModel,
+    loginState: LoginUiState,
+    useBackend: Boolean,
+    onDismiss: () -> Unit,
+    onSuccess: () -> Unit
+) {
+    // Kick off the QR generation once when the dialog opens.
+    LaunchedEffect(Unit) { vm.startQrLogin() }
+    // Close automatically on success; keep the last QR visible through AwaitingConfirm.
+    var shownKey by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(loginState) {
+        when (loginState) {
+            is LoginUiState.Success -> onSuccess()
+            is LoginUiState.AwaitingScan -> shownKey = loginState.qrKey
+            else -> Unit
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("关闭") }
+        },
+        title = { Text("登录网易云音乐") },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                if (useBackend) {
+                    Text(
+                        "当前为本地后端模式，登录仅支持直连模式；请先在「数据源」切回直连。",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    when (loginState) {
+                        is LoginUiState.Generating -> {
+                            Spacer(Modifier.height(8.dp))
+                            LoadingIndicator()
+                            Spacer(Modifier.height(12.dp))
+                            Text("正在生成二维码…", style = MaterialTheme.typography.bodySmall)
+                        }
+                        is LoginUiState.AwaitingScan, is LoginUiState.AwaitingConfirm, is LoginUiState.Error -> {
+                            shownKey?.let { key ->
+                                QrCodeImage(
+                                    content = com.hh.music.player.network.LoginClient.qrContent(key),
+                                    modifier = Modifier.size(220.dp)
+                                )
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            val hint = when (loginState) {
+                                is LoginUiState.AwaitingConfirm -> "已扫码，请在手机上确认登录"
+                                is LoginUiState.Error -> loginState.message
+                                else -> "使用网易云音乐 APP 扫码登录"
+                            }
+                            Text(
+                                hint,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (loginState is LoginUiState.Error) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            TextButton(onClick = { vm.retryFromError() }) { Text("刷新二维码") }
+                        }
+                        LoginUiState.Success, LoginUiState.Idle -> Unit
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+                    Text(
+                        "无法扫码？粘贴浏览器 Cookie 中的 MUSIC_U",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    var cookieText by remember { mutableStateOf("") }
+                    OutlinedTextField(
+                        value = cookieText,
+                        onValueChange = { cookieText = it },
+                        enabled = loginState !is LoginUiState.Success,
+                        placeholder = { Text("MUSIC_U=… 或纯令牌", style = MaterialTheme.typography.bodySmall) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    TextButton(
+                        onClick = { vm.loginWithCookie(cookieText) },
+                        enabled = cookieText.isNotBlank()
+                    ) { Text("使用 Cookie 登录") }
+                }
+            }
+        }
+    )
+}
+
+/** Renders [content] as a QR code entirely on-device via ZXing. */
+@Composable
+private fun QrCodeImage(content: String, modifier: Modifier = Modifier) {
+    val sizePx = 512
+    val image = remember(content) {
+        runCatching {
+            val matrix = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, sizePx, sizePx)
+            val pixels = IntArray(sizePx * sizePx)
+            for (y in 0 until sizePx) {
+                for (x in 0 until sizePx) {
+                    pixels[y * sizePx + x] = if (matrix[x, y]) Color.Black.toArgb() else Color.White.toArgb()
+                }
+            }
+            Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888).apply {
+                setPixels(pixels, 0, sizePx, 0, 0, sizePx, sizePx)
+            }.asImageBitmap()
+        }.getOrNull()
+    }
+    Box(modifier, contentAlignment = Alignment.Center) {
+        if (image != null) {
+            Image(bitmap = image, contentDescription = "登录二维码", modifier = Modifier.fillMaxSize())
+        } else {
+            LoadingIndicator()
         }
     }
 }

@@ -6,12 +6,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Whatshot
@@ -21,27 +22,33 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.graphics.shapes.RoundedPolygon
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.hh.music.player.data.MusicRepository
 import com.hh.music.player.data.Song
 import com.hh.music.player.network.RecommendPlaylistItem
 import com.hh.music.player.ui.LocalPlayerController
 import com.hh.music.player.ui.components.ArtworkImage
+import com.hh.music.player.ui.components.BadgeShapes
 import com.hh.music.player.ui.components.ErrorState
 import com.hh.music.player.ui.components.LoadingState
 import com.hh.music.player.ui.components.MiniPlayerBar
+import com.hh.music.player.ui.components.ShapeBadge
 import com.hh.music.player.ui.components.SongRow
 
 private enum class MoreSection { RECOMMEND, NEW, PLAYLISTS }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun DiscoverScreen(
     repository: MusicRepository,
     onOpenToplist: () -> Unit,
+    onOpenPlaza: () -> Unit = {},
+    onPersonalFm: () -> Unit = {},
     onSearch: (String) -> Unit,
     onOpenPlaylist: (Long) -> Unit,
     onOpenPlayer: () -> Unit,
@@ -53,15 +60,17 @@ fun DiscoverScreen(
     val isPlaying by player.isPlaying.collectAsState()
     var moreSection by remember { mutableStateOf<MoreSection?>(null) }
 
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 6.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("HH Music", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                        Text("听见此刻", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+            // M3E 大标题栏：折叠为紧凑标题，展开时展示副标题。
+            LargeFlexibleTopAppBar(
+                title = { Text("HH Music", fontWeight = FontWeight.SemiBold) },
+                subtitle = { Text("听见此刻") },
+                actions = {
                     TooltipBox(
                         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                         tooltip = { PlainTooltip { Text("刷新推荐") } },
@@ -71,36 +80,56 @@ fun DiscoverScreen(
                             Icon(Icons.Filled.Refresh, contentDescription = "刷新")
                         }
                     }
-                }
-                Spacer(Modifier.height(12.dp))
-                Surface(
-                    shape = SearchBarDefaults.dockedShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    tonalElevation = SearchBarDefaults.TonalElevation,
-                    shadowElevation = SearchBarDefaults.ShadowElevation,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .clickable { onSearch("") }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Filled.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.width(12.dp))
-                        Text("搜索歌曲、歌手或歌单", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                scrollBehavior = scrollBehavior
+            )
         }
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
+        // M3E 下拉刷新：复用原有强制刷新逻辑。
+        PullToRefreshBox(
+            isRefreshing = state.allEmpty && state.recommend.loading,
+            onRefresh = { vm.refresh(force = true) },
+            modifier = Modifier.fillMaxSize().padding(padding)
+        ) {
             when {
                 state.allEmpty && state.recommend.loading -> LoadingState()
                 state.allEmpty && state.allFailed -> ErrorState("推荐加载失败，请检查网络", { vm.refresh(force = true) })
                 else -> LazyColumn(Modifier.fillMaxSize()) {
-                    item { QuickEntries(state, onOpenToplist, { songs -> player.playQueue(songs, 0) }) }
+                    item {
+                        // 搜索入口（自 v1.6 起从顶栏迁移至内容区首项）
+                        Surface(
+                            shape = SearchBarDefaults.dockedShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            tonalElevation = SearchBarDefaults.TonalElevation,
+                            shadowElevation = SearchBarDefaults.ShadowElevation,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .height(56.dp)
+                                .clickable { onSearch("") }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Filled.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.width(12.dp))
+                                Text("搜索歌曲、歌手或歌单", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                    item {
+                        QuickEntries(
+                            state,
+                            onOpenToplist,
+                            onOpenPlaza,
+                            onPersonalFm,
+                            { songs -> player.playQueue(songs, 0) }
+                        )
+                    }
                     item {
                         Spacer(Modifier.height(10.dp))
                         SectionTitle(
@@ -205,7 +234,8 @@ fun DiscoverScreen(
     }
 }
 
-/** 模块级内容区：有数据 → 渲染；失败 → 行内错误 + 重试；加载中（无数据） → 行内骨架。 */
+/** 模块级内容区：有数据 → 渲染；失败 → 行内错误 + 重试；加载中（无数据） → 行内 M3E 加载。 */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun <T> SectionContent(
     section: SectionState<T>,
@@ -225,7 +255,7 @@ private fun <T> SectionContent(
             TextButton(onClick = onRetry) { Text("重试") }
         }
         else -> Box(Modifier.fillMaxWidth().height(140.dp), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+            LoadingIndicator()
         }
     }
 }
@@ -234,32 +264,50 @@ private fun <T> SectionContent(
 private fun QuickEntries(
     state: DiscoverState,
     onOpenToplist: () -> Unit,
+    onOpenPlaza: () -> Unit,
+    onPersonalFm: () -> Unit,
     onPlay: (List<Song>) -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        QuickEntry("排行榜", Icons.Filled.Leaderboard, onOpenToplist, Modifier.weight(1f))
+        QuickEntry("排行榜", Icons.Filled.Leaderboard, BadgeShapes.Sunny, onOpenToplist, Modifier.weight(1f))
+        QuickEntry("歌单广场", Icons.Filled.QueueMusic, BadgeShapes.Cookie, onOpenPlaza, Modifier.weight(1f))
+        QuickEntry(
+            "私人FM",
+            Icons.Filled.Radio,
+            BadgeShapes.Burst,
+            {
+                android.widget.Toast.makeText(context, "私人FM加载中…", android.widget.Toast.LENGTH_SHORT).show()
+                onPersonalFm()
+            },
+            Modifier.weight(1f)
+        )
         QuickEntry(
             "每日推荐",
             Icons.Filled.AutoAwesome,
+            BadgeShapes.Clover,
             { if (state.recommend.data.isNotEmpty()) onPlay(state.recommend.data) },
             Modifier.weight(1f)
         )
         QuickEntry(
             "新歌速递",
             Icons.Filled.Whatshot,
+            BadgeShapes.Flower,
             { if (state.newSongs.data.isNotEmpty()) onPlay(state.newSongs.data) },
             Modifier.weight(1f)
         )
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun QuickEntry(
     label: String,
     icon: ImageVector,
+    shape: RoundedPolygon,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -268,13 +316,13 @@ private fun QuickEntry(
             Modifier.padding(vertical = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(
-                Modifier.size(44.dp).clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.secondaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
-            }
+            ShapeBadge(
+                icon = icon,
+                shape = shape,
+                badgeSize = 44.dp,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                containerColor = MaterialTheme.colorScheme.secondaryContainer
+            )
             Spacer(Modifier.height(8.dp))
             Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
         }

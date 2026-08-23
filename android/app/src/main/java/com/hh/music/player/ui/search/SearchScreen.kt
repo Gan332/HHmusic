@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package com.hh.music.player.ui.search
 
 import androidx.compose.foundation.background
@@ -35,8 +37,6 @@ import com.hh.music.player.ui.components.LoadingState
 import com.hh.music.player.ui.components.MiniPlayerBar
 import com.hh.music.player.ui.components.SongRow
 import kotlinx.coroutines.launch
-
-private val HOT_SEARCHES = listOf("周杰伦", "林俊杰", "陈奕迅", "许嵩", "毛不易", "邓紫棋")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -123,7 +123,7 @@ fun SearchScreen(
                     )
                     state.query.isBlank() -> SearchSuggestionsSection(
                         history = history,
-                        hotSearches = HOT_SEARCHES,
+                        hotSearches = state.hotSearches,
                         onPick = { kw ->
                             actualVm.onQueryChange(kw)
                             actualVm.submitSearch(kw)
@@ -162,7 +162,7 @@ fun SearchScreen(
                 state.loading -> LoadingState()
                 state.query.isBlank() -> SearchSuggestionsSection(
                     history = history,
-                    hotSearches = HOT_SEARCHES,
+                    hotSearches = state.hotSearches,
                     onPick = { kw ->
                         actualVm.onQueryChange(kw)
                         actualVm.submitSearch(kw)
@@ -238,7 +238,7 @@ private fun SearchResultsList(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     when {
-                        state.loadingMore -> CircularProgressIndicator(modifier = Modifier.size(26.dp))
+                        state.loadingMore -> LoadingIndicator(modifier = Modifier.size(26.dp))
                         state.loadMoreError != null -> {
                             Text(
                                 "加载失败：${state.loadMoreError}",

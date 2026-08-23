@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.hh.music.player.data.SavedPlaylist
@@ -98,6 +99,28 @@ class LocalStore(private val context: Context) {
     val equalizerPreset: Flow<String> = context.dataStore.data.map { it[equalizerPresetKey] ?: "default" }
     private val equalizerBandsKey = stringPreferencesKey("equalizer_bands")
     val equalizerBands: Flow<String> = context.dataStore.data.map { it[equalizerBandsKey] ?: "" }
+    // ---- v1.7: bass boost / virtualizer / track fade ----
+    private val bassBoostEnabledKey = booleanPreferencesKey("bass_boost_enabled")
+    val bassBoostEnabled: Flow<Boolean> = context.dataStore.data.map { it[bassBoostEnabledKey] ?: false }
+    private val bassBoostStrengthKey = intPreferencesKey("bass_boost_strength")
+    val bassBoostStrength: Flow<Int> = context.dataStore.data.map { (it[bassBoostStrengthKey] ?: 500).coerceIn(0, 1000) }
+    private val virtualizerEnabledKey = booleanPreferencesKey("virtualizer_enabled")
+    val virtualizerEnabled: Flow<Boolean> = context.dataStore.data.map { it[virtualizerEnabledKey] ?: false }
+    private val virtualizerStrengthKey = intPreferencesKey("virtualizer_strength")
+    val virtualizerStrength: Flow<Int> = context.dataStore.data.map { (it[virtualizerStrengthKey] ?: 500).coerceIn(0, 1000) }
+    /** Track fade length in seconds; 0 disables fading. */
+    private val fadeDurationSecKey = intPreferencesKey("fade_duration_sec")
+    val fadeDurationSec: Flow<Int> = context.dataStore.data.map { (it[fadeDurationSecKey] ?: 0).coerceIn(0, 6) }
+
+    // ---- v1.8: NetEase account (MUSIC_U token only, never the raw header dump) ----
+    private val loginCookieKey = stringPreferencesKey("login_cookie")
+    val loginCookie: Flow<String> = context.dataStore.data.map { it[loginCookieKey] ?: "" }
+    private val userIdKey = longPreferencesKey("user_id")
+    val userId: Flow<Long> = context.dataStore.data.map { it[userIdKey] ?: 0L }
+    private val nicknameKey = stringPreferencesKey("nickname")
+    val nickname: Flow<String> = context.dataStore.data.map { it[nicknameKey] ?: "" }
+    private val avatarUrlKey = stringPreferencesKey("avatar_url")
+    val avatarUrl: Flow<String> = context.dataStore.data.map { it[avatarUrlKey] ?: "" }
     private val autoCacheKey = booleanPreferencesKey("auto_cache")
     val autoCache: Flow<Boolean> = context.dataStore.data.map { it[autoCacheKey] ?: true }
     private val cacheCapMbKey = intPreferencesKey("cache_cap_mb")
@@ -204,6 +227,33 @@ suspend fun clearSearchHistory() {
     suspend fun setEqualizerEnabled(value: Boolean) { context.dataStore.edit { it[equalizerEnabledKey] = value } }
     suspend fun setEqualizerPreset(value: String) { context.dataStore.edit { it[equalizerPresetKey] = value } }
     suspend fun setEqualizerBands(value: String) { context.dataStore.edit { it[equalizerBandsKey] = value } }
+    suspend fun setBassBoostEnabled(value: Boolean) { context.dataStore.edit { it[bassBoostEnabledKey] = value } }
+    suspend fun setBassBoostStrength(value: Int) { context.dataStore.edit { it[bassBoostStrengthKey] = value.coerceIn(0, 1000) } }
+    suspend fun setVirtualizerEnabled(value: Boolean) { context.dataStore.edit { it[virtualizerEnabledKey] = value } }
+    suspend fun setVirtualizerStrength(value: Int) { context.dataStore.edit { it[virtualizerStrengthKey] = value.coerceIn(0, 1000) } }
+    suspend fun setFadeDurationSec(value: Int) { context.dataStore.edit { it[fadeDurationSecKey] = value.coerceIn(0, 6) } }
+
+    suspend fun setLoginCookie(value: String) {
+        context.dataStore.edit {
+            if (value.isBlank()) it.remove(loginCookieKey) else it[loginCookieKey] = value
+        }
+    }
+    suspend fun setAccount(userId: Long, nickname: String, avatarUrl: String) {
+        context.dataStore.edit { p ->
+            p[userIdKey] = userId
+            p[nicknameKey] = nickname
+            p[avatarUrlKey] = avatarUrl
+        }
+    }
+    /** Log out: wipe the MUSIC_U token and cached profile in one atomic edit. */
+    suspend fun clearAccount() {
+        context.dataStore.edit { p ->
+            p.remove(loginCookieKey)
+            p.remove(userIdKey)
+            p.remove(nicknameKey)
+            p.remove(avatarUrlKey)
+        }
+    }
     suspend fun setAutoCache(value: Boolean) { context.dataStore.edit { it[autoCacheKey] = value } }
     suspend fun setCacheCapMb(value: Int) { context.dataStore.edit { it[cacheCapMbKey] = value } }
     suspend fun setDownloads(entries: List<DownloadEntry>) {

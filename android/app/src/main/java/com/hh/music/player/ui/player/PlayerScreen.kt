@@ -43,7 +43,7 @@ import com.hh.music.player.ui.components.SongRow
 import com.hh.music.player.ui.components.formatDuration
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PlayerScreen(
     repository: MusicRepository,
@@ -54,6 +54,7 @@ fun PlayerScreen(
     val player = LocalPlayerController.current
     val store = LocalStoreProvider.current
     val equalizer = LocalEqualizerController.current
+    val cloudSync = com.hh.music.player.ui.LocalCloudSync.current
     val song by player.currentSong.collectAsState()
     val isPlaying by player.isPlaying.collectAsState()
     val queue by player.queue.collectAsState()
@@ -150,7 +151,87 @@ fun PlayerScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                // v1.5 倍速：chip 弹出档位选择，全局生效并持久化
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                    tooltip = { PlainTooltip { Text(if (isFav) "取消收藏" else "收藏") } },
+                    state = rememberTooltipState()
+                ) {
+                    IconButton(onClick = {
+                        song?.let {
+                            val willLike = !isFav
+                            scope.launch {
+                                store.toggleFavorite(it)
+                                cloudSync.pushLike(it.id, willLike)
+                            }
+                        }
+                    }) {
+                        Icon(
+                            if (isFav) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                            contentDescription = "收藏",
+                            tint = if (isFav) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                    tooltip = { PlainTooltip { Text("播放队列") } },
+                    state = rememberTooltipState()
+                ) {
+                    FilledTonalIconButton(onClick = { showQueue = true }) {
+                        Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = "队列")
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // Cover (stable; recomposes on song change only)
+            val currentSongForCover = song
+            if (currentSongForCover != null) {
+                ArtworkImage(
+                    url = currentSongForCover.coverUrl,
+                    contentDescription = currentSongForCover.name,
+                    modifier = Modifier
+                        .fillMaxWidth(0.72f)
+                        .aspectRatio(1f)
+                        .clip(MaterialTheme.shapes.extraLarge)
+                        .align(Alignment.CenterHorizontally)
+                )
+                // 播放地址解析中 — subtle inline wavy progress until the URL is hot-swapped in.
+                if (resolving) {
+                    LinearWavyProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth(0.72f)
+                            .align(Alignment.CenterHorizontally)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Lyrics — isolated composable that reads position; only this subtree recomposes per second.
+            LyricsSection(
+                lyricState = lyricState,
+                positionFlow = player.positionMs,
+                onRetryLyric = { song?.id?.let { vm.loadLyric(it) } },
+                onSeek = player::seekTo,
+                modifier = Modifier.weight(1f).fillMaxWidth()
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            // Progress slider — isolated; only this recomposes with position.
+            ProgressSection(player = player, style = progressStyle, songId = song?.id ?: 0L)
+
+            Spacer(Modifier.height(10.dp))
+
+            // M3E 浮动工具栏：倍速 / 定时 / 音效（自 v1.6 起从顶栏迁移至此）。
+            HorizontalFloatingToolbar(
+                expanded = true,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            ) {
+                // 倍速：chip 弹出档位选择，全局生效并持久化
                 Box {
                     TextButton(onClick = { speedMenu = true }) {
                         Text(
@@ -176,21 +257,7 @@ fun PlayerScreen(
                         }
                     }
                 }
-                // v1.5 定时关闭：激活时显示剩余时间
-                if (sleepRemaining != null) {
-                    Box(
-                        Modifier
-                            .clip(MaterialTheme.shapes.small)
-                            .background(MaterialTheme.colorScheme.primaryContainer)
-                            .padding(horizontal = 6.dp, vertical = 3.dp)
-                    ) {
-                        Text(
-                            formatSleepRemaining(sleepRemaining),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                }
+                // 定时关闭：激活时图标高亮并在旁边显示剩余时间
                 Box {
                     TooltipBox(
                         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
@@ -235,7 +302,14 @@ fun PlayerScreen(
                         }
                     }
                 }
-                // v1.5 音效：均衡器预置面板
+                if (sleepRemaining != null) {
+                    Text(
+                        formatSleepRemaining(sleepRemaining),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                // 音效：均衡器预置面板
                 TooltipBox(
                     positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                     tooltip = { PlainTooltip { Text("音效") } },
@@ -245,70 +319,7 @@ fun PlayerScreen(
                         Icon(Icons.Filled.Equalizer, contentDescription = "音效")
                     }
                 }
-                TooltipBox(
-                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                    tooltip = { PlainTooltip { Text(if (isFav) "取消收藏" else "收藏") } },
-                    state = rememberTooltipState()
-                ) {
-                    IconButton(onClick = { song?.let { scope.launch { store.toggleFavorite(it) } } }) {
-                        Icon(
-                            if (isFav) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                            contentDescription = "收藏",
-                            tint = if (isFav) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                TooltipBox(
-                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                    tooltip = { PlainTooltip { Text("播放队列") } },
-                    state = rememberTooltipState()
-                ) {
-                    FilledTonalIconButton(onClick = { showQueue = true }) {
-                        Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = "队列")
-                    }
-                }
             }
-
-            Spacer(Modifier.height(12.dp))
-
-            // Cover (stable; recomposes on song change only)
-            val currentSongForCover = song
-            if (currentSongForCover != null) {
-                ArtworkImage(
-                    url = currentSongForCover.coverUrl,
-                    contentDescription = currentSongForCover.name,
-                    modifier = Modifier
-                        .fillMaxWidth(0.72f)
-                        .aspectRatio(1f)
-                        .clip(MaterialTheme.shapes.extraLarge)
-                        .align(Alignment.CenterHorizontally)
-                )
-                // 播放地址解析中 — subtle inline progress until the URL is hot-swapped in.
-                if (resolving) {
-                    LinearProgressIndicator(
-                        modifier = Modifier
-                            .fillMaxWidth(0.72f)
-                            .align(Alignment.CenterHorizontally)
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            // Lyrics — isolated composable that reads position; only this subtree recomposes per second.
-            LyricsSection(
-                lyricState = lyricState,
-                positionFlow = player.positionMs,
-                onRetryLyric = { song?.id?.let { vm.loadLyric(it) } },
-                onSeek = player::seekTo,
-                modifier = Modifier.weight(1f).fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            // Progress slider — isolated; only this recomposes with position.
-            ProgressSection(player = player, style = progressStyle, songId = song?.id ?: 0L)
 
             Spacer(Modifier.height(4.dp))
 
@@ -517,7 +528,7 @@ private fun formatSleepRemaining(ms: Long?): String {
 }
 
 /**
- * 均衡器面板：开关 + 预置 chips + 自定义频段滑杆。
+ * 音效面板：均衡器（开关 + 预置 chips + 自定义频段滑杆）、重低音、环绕声、淡入淡出。
  * 读 [LocalEqualizerController] 的可用性与频段；写入 [LocalStore] 即时应用到播放会话。
  */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
@@ -533,13 +544,20 @@ private fun EqualizerSheet(
     val bandsString by store.equalizerBands.collectAsState(initial = "")
     val available by equalizer.isAvailable.collectAsState()
     val bandFreqs by equalizer.bandFreqs.collectAsState()
+    val bassAvailable by equalizer.bassAvailable.collectAsState()
+    val virtualizerAvailable by equalizer.virtualizerAvailable.collectAsState()
+    val bassOn by store.bassBoostEnabled.collectAsState(initial = false)
+    val bassStrength by store.bassBoostStrength.collectAsState(initial = 500)
+    val virtOn by store.virtualizerEnabled.collectAsState(initial = false)
+    val virtStrength by store.virtualizerStrength.collectAsState(initial = 500)
+    val fadeSec by store.fadeDurationSec.collectAsState(initial = 0)
 
     val customBands = remember(bandsString) { EqualizerPresets.parseBands(bandsString) }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("均衡器", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                Text("音效", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                 Text(
                     if (available) "已连接音频会话" else "当前设备不支持",
                     style = MaterialTheme.typography.bodySmall,
@@ -612,6 +630,87 @@ private fun EqualizerSheet(
                     }
                 }
             }
+
+            // ---- v1.7 重低音 ----
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("重低音", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        if (bassAvailable) "增强低频力度" else "当前设备不支持",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (bassAvailable) MaterialTheme.colorScheme.onSurfaceVariant
+                        else MaterialTheme.colorScheme.error
+                    )
+                }
+                Switch(
+                    checked = bassOn && bassAvailable,
+                    onCheckedChange = { scope.launch { store.setBassBoostEnabled(it && bassAvailable) } },
+                    enabled = bassAvailable
+                )
+            }
+            var localBass by remember(bassStrength) { mutableStateOf(bassStrength.toFloat()) }
+            Slider(
+                value = localBass.coerceIn(0f, 1000f),
+                onValueChange = { localBass = it },
+                onValueChangeFinished = { scope.launch { store.setBassBoostStrength(localBass.toInt()) } },
+                enabled = bassAvailable && bassOn,
+                valueRange = 0f..1000f
+            )
+
+            // ---- v1.7 环绕声 ----
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("环绕声", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        if (virtualizerAvailable) "虚拟化空间声场" else "当前设备不支持",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (virtualizerAvailable) MaterialTheme.colorScheme.onSurfaceVariant
+                        else MaterialTheme.colorScheme.error
+                    )
+                }
+                Switch(
+                    checked = virtOn && virtualizerAvailable,
+                    onCheckedChange = { scope.launch { store.setVirtualizerEnabled(it && virtualizerAvailable) } },
+                    enabled = virtualizerAvailable
+                )
+            }
+            var localVirt by remember(virtStrength) { mutableStateOf(virtStrength.toFloat()) }
+            Slider(
+                value = localVirt.coerceIn(0f, 1000f),
+                onValueChange = { localVirt = it },
+                onValueChangeFinished = { scope.launch { store.setVirtualizerStrength(localVirt.toInt()) } },
+                enabled = virtualizerAvailable && virtOn,
+                valueRange = 0f..1000f
+            )
+
+            // ---- v1.7 淡入淡出 ----
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(12.dp))
+            Text("歌曲淡入淡出", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "曲目自然衔接时渐弱/渐强；手动切歌不受影响",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp, bottom = 6.dp)
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                PlaybackEngine.FADE_OPTIONS_SEC.forEach { sec ->
+                    FilterChip(
+                        selected = fadeSec == sec,
+                        onClick = { scope.launch { store.setFadeDurationSec(sec) } },
+                        label = { Text(if (sec == 0) "关" else "${sec}秒") }
+                    )
+                }
+            }
+
             Spacer(Modifier.height(24.dp))
         }
     }

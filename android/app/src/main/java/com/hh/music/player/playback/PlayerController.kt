@@ -153,6 +153,7 @@ class PlayerController(
         startPositionPolling()
         observePersistedPlayMode()
         observePersistedSpeed()
+        observePersistedFade()
         restoreQueue()
     }
 
@@ -205,6 +206,12 @@ class PlayerController(
         if (listener != null) return
         listener = object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                // Every transition ends an in-flight fade; tracks start at full volume
+                // unless this was a natural auto-advance (then a short fade-in follows).
+                cancelFades()
+                val naturalAdvance = reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO &&
+                    !autoAdvancing && !restoringAfterBoot &&
+                    sleepTimerMode != SleepTimerMode.END_OF_TRACK
                 val idx = c.currentMediaItemIndex
                 if (idx == C.INDEX_UNSET || idx >= _queue.value.size) {
                     _currentIndex.value = -1
@@ -214,6 +221,7 @@ class PlayerController(
                 _currentIndex.value = idx
                 val song = _queue.value[idx]
                 _currentSong.value = song
+                PlayerWidgetProvider.requestRefresh(context)
                 // Only record "recently played" for user-initiated changes: never for
                 // silent restores after reboot, nor for error auto-skips.
                 when {
@@ -228,6 +236,7 @@ class PlayerController(
                 // otherwise be wiped back to 0 by this transition callback).
                 persistQueue(_queue.value, idx, c.currentPosition.coerceAtLeast(0L))
                 prefetchNext()
+                if (_fadeDurationSec.value > 0 && naturalAdvance) startFadeIn()
                 // v1.5 sleep timer "end of track": the player just auto-advanced
                 // because the current track finished (sequence/shuffle) → fade + pause.
                 if (sleepTimerMode == SleepTimerMode.END_OF_TRACK &&
@@ -238,6 +247,7 @@ class PlayerController(
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _isPlaying.value = isPlaying
+                PlayerWidgetProvider.requestRefresh(context)
                 if (isPlaying) {
                     // Keep the offline cache's "currently playing" protection + LRU
                     // timestamp pointing at the track that is actually audible.
@@ -249,6 +259,8 @@ class PlayerController(
                     // Successful playback resets the consecutive-failure journal.
                     failureOf.clear()
                 } else {
+                    // Any pause ends fades and restores full volume for the next play.
+                    cancelFades()
                     // Persist the exact position on pause/stop so we can resume it later.
                     val idx = c.currentMediaItemIndex
                     if (idx in _queue.value.indices && c.mediaItemCount > 0) {
@@ -367,6 +379,7 @@ class PlayerController(
                 val coarse = (pos / 1000L) * 1000L
                 if (coarse != _positionMs.value) _positionMs.value = coarse
                 if (c.duration > 0 && c.duration != _durationMs.value) _durationMs.value = c.duration
+                maybeFadeOutTick(c, pos)
                 // Throttled position persistence (~10s) so a killed app resumes mid-song.
                 if (coarse - lastPersistedPositionMs >= 10_000L) {
                     lastPersistedPositionMs = coarse
@@ -392,6 +405,90 @@ class PlayerController(
                 _speed.value = s
                 applySpeedToPlayer()
             }
+        }
+    }
+
+    // ---- v1.7: track fade-in/out (crossfade-lite) ----
+    private val _fadeDurationSec = MutableStateFlow(0)
+    /** Configured fade length in seconds; 0 disables fading. */
+    val fadeDurationSec: StateFlow<Int> = _fadeDurationSec.asStateFlow()
+    private var fadeOutJob: Job? = null
+    private var fadeInJob: Job? = null
+
+    private fun observePersistedFade() {
+        scope.launch {
+            local?.fadeDurationSec?.collectLatest { sec ->
+                _fadeDurationSec.value = sec
+                if (sec <= 0) cancelFades()
+            }
+        }
+    }
+
+    /** Stop any in-flight fade ramps and put the player volume back where it belongs. */
+    private fun cancelFades(restoreVolume: Boolean = true) {
+        fadeOutJob?.cancel()
+        fadeOutJob = null
+        fadeInJob?.cancel()
+        fadeInJob = null
+        if (restoreVolume) controller?.let { c -> runCatching { c.volume = 1f } }
+    }
+
+    /**
+     * Polling tick (500ms): start the fade-out once the current track enters its
+     * tail window, and undo it again if the user seeks back out of the window.
+     * Skipped entirely for repeat-one (no transition would ever restore volume)
+     * and for the sleep timer's own end-of-track fade, which owns the ending.
+     */
+    private fun maybeFadeOutTick(c: MediaController, posMs: Long) {
+        val d = _fadeDurationSec.value
+        if (d <= 0 || _playMode.value == PlayMode.REPEAT_ONE) return
+        if (sleepTimerMode == SleepTimerMode.END_OF_TRACK) return
+        val dur = c.duration
+        if (fadeOutJob != null) {
+            // Already ramping — abort + restore when the track left the window.
+            if (!c.isPlaying || dur <= 0 || !PlaybackEngine.shouldStartFade(posMs, dur, d)) {
+                fadeOutJob?.cancel()
+                fadeOutJob = null
+                runCatching { c.volume = 1f }
+            }
+            return
+        }
+        if (fadeInJob != null || !c.isPlaying || dur <= 0) return
+        if (!PlaybackEngine.shouldStartFade(posMs, dur, d)) return
+        fadeOutJob = scope.launch {
+            val steps = 20
+            val stepMs = (d * 1000L / steps).coerceAtLeast(25L)
+            val startVol = runCatching { c.volume }.getOrDefault(1f).coerceIn(0f, 1f)
+            repeat(steps) { i ->
+                if (!isActive) return@launch
+                if (!c.isPlaying) {
+                    runCatching { c.volume = 1f }
+                    return@launch
+                }
+                runCatching { c.volume = startVol * PlaybackEngine.fadeVolume((i + 1).toFloat() / steps) }
+                delay(stepMs)
+            }
+        }
+    }
+
+    /** Ramp the volume from silence back up to full after a natural auto-advance. */
+    private fun startFadeIn() {
+        val d = _fadeDurationSec.value
+        val c = controller ?: return
+        fadeInJob?.cancel()
+        fadeInJob = scope.launch {
+            val steps = 16
+            val stepMs = (d * 1000L / steps).coerceAtLeast(25L)
+            runCatching { c.volume = 0f }
+            repeat(steps) { i ->
+                if (!isActive || !c.isPlaying) {
+                    runCatching { c.volume = 1f }
+                    return@launch
+                }
+                runCatching { c.volume = (i + 1).toFloat() / steps }
+                delay(stepMs)
+            }
+            runCatching { c.volume = 1f }
         }
     }
 
@@ -532,6 +629,7 @@ private fun recordRecent(song: Song) {
     /** 1.5s linear volume fade to zero, then pause; volume restored for next play. */
     private fun fadeOutAndPause() {
         stopSleepTimer()
+        cancelFades(restoreVolume = false) // this routine owns the volume ramp now
         val c = controller ?: return
         scope.launch {
             val steps = 12
@@ -698,6 +796,7 @@ private fun recordRecent(song: Song) {
         autoAdvancing = false
         restoringAfterBoot = false
         resetPositionJournal()
+        cancelFades()
         scope.launch { local?.clearQueue() }
     }
 

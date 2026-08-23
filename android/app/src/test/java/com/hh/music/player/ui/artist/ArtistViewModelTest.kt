@@ -81,4 +81,77 @@ class ArtistViewModelTest {
         assertEquals("time", vm.state.value.order)
         Dispatchers.resetMain()
     }
+
+    private fun album(id: Long, name: String) = AlbumItem(id = id, name = name, songCount = 10)
+
+    @Test
+    fun `switching to albums tab lazy loads then appends more`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val offsets = mutableListOf<Int>()
+        val vm = ArtistViewModel(
+            pageLoader = { _, _, _, _ -> Result.success(ArtistSongsPage(total = 0)) },
+            artistId = 42L,
+            artistName = "周杰伦",
+            albumLoader = { _, limit, offset ->
+                offsets += offset
+                if (offset == 0) {
+                    Result.success(ArtistAlbumsPage(albums = (0 until limit).map { album(it.toLong(), "a$it") }, more = true))
+                } else {
+                    Result.success(ArtistAlbumsPage(albums = listOf(album(999L, "extra"), album(0L, "dup")), more = false))
+                }
+            }
+        )
+
+        runCurrent()
+        assertTrue(vm.state.value.albums.isEmpty())
+
+        vm.setTab(ArtistUiState.TAB_ALBUMS)
+        runCurrent()
+        assertEquals(ArtistUiState.TAB_ALBUMS, vm.state.value.selectedTab)
+        assertEquals(50, vm.state.value.albums.size)
+
+        vm.loadMoreAlbums()
+        runCurrent()
+        // Dedup by id drops the id=0 filler; extra page appended exactly once.
+        assertEquals(51, vm.state.value.albums.size)
+        assertEquals(listOf(0, 50), offsets)
+        assertFalse(vm.state.value.albumsMore)
+
+        // No further fetch once exhausted.
+        vm.loadMoreAlbums()
+        runCurrent()
+        assertEquals(51, vm.state.value.albums.size)
+        Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `albums failure keeps error until retry succeeds`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        var fail = true
+        val vm = ArtistViewModel(
+            pageLoader = { _, _, _, _ -> Result.success(ArtistSongsPage(total = 0)) },
+            artistId = 42L,
+            artistName = "周杰伦",
+            albumLoader = { _, _, _ ->
+                if (fail) {
+                    Result.failure(IllegalStateException("网络错误"))
+                } else {
+                    Result.success(ArtistAlbumsPage(albums = listOf(album(1L, "叶惠美"))))
+                }
+            }
+        )
+
+        runCurrent()
+        vm.setTab(ArtistUiState.TAB_ALBUMS)
+        runCurrent()
+        assertEquals("网络错误", vm.state.value.albumsError)
+        assertTrue(vm.state.value.albums.isEmpty())
+
+        fail = false
+        vm.retryAlbums()
+        runCurrent()
+        assertEquals(null, vm.state.value.albumsError)
+        assertEquals(1, vm.state.value.albums.size)
+        Dispatchers.resetMain()
+    }
 }

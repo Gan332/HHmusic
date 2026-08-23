@@ -61,6 +61,27 @@ function makeApp(overrides = {}) {
     getRecommendSongs: async () => ok({ data: { dailySongs: [{ id: 4, name: "r" }] } }),
     getRecommendPlaylists: async () => ok({ result: [{ id: 5, name: "pl" }] }),
     getArtistSongs: async () => ok({ total: 9, songs: [{ id: 6, name: "a" }] }),
+    getHotSearches: async () =>
+      ok({ result: { hots: [{ first: "周杰伦" }, { first: " 林俊杰 " }, { first: "" }, {}] } }),
+    getArtistAlbums: async () =>
+      ok({
+        more: true,
+        hotAlbums: [
+          { id: 111, name: "叶惠美", picUrl: "https://p.music.163.com/al.jpg", publishTime: 1056969600000, size: 11 },
+          { id: 222, name: "无封面", blurPicUrl: "https://p.music.163.com/blur.jpg", publishTime: 0, size: 10 },
+        ],
+      }),
+    getAlbumDetail: async () =>
+      ok({
+        album: {
+          id: 18879,
+          name: "叶惠美",
+          picUrl: "https://p.music.163.com/cover.jpg",
+          description: "第四张创作专辑",
+          publishTime: 1056969600000,
+        },
+        songs: [{ id: 185811, name: "以父之名", ar: [{ id: 42, name: "周杰伦" }], al: { id: 18879, name: "叶惠美" }, dt: 342000 }],
+      }),
     getNewSongs: async () => ok({ result: [{ song: { id: 7, name: "n" } }] }),
     likeSong: async (id, like) => ok({ code: 200, data: { code: 200, id, like } }),
     ...overrides,
@@ -181,6 +202,65 @@ describe("artist routes", () => {
   });
 });
 
+describe("artist albums & album detail routes", () => {
+  test("artist albums normalizes hotAlbums and passes more through", async () => {
+    await withServer(makeApp(), async (base) => {
+      const { status, body } = await getJson(base, "/api/artist/albums?id=42&limit=10&offset=5");
+      assert.equal(status, 200);
+      assert.equal(body.more, true);
+      assert.deepEqual(body.hotAlbums, [
+        { id: 111, name: "叶惠美", picUrl: "https://p.music.163.com/al.jpg", publishTime: 1056969600000, songCount: 11 },
+        { id: 222, name: "无封面", picUrl: "https://p.music.163.com/blur.jpg", publishTime: 0, songCount: 10 },
+      ]);
+    });
+  });
+
+  test("artist albums falls back to real upstream when not stubbed", async () => {
+    // No getArtistAlbums stub -> createApp must wire the real netease wrapper.
+    const app = createApp({});
+    await withServer(app, async (base) => {
+      const { status } = await getJson(base, "/api/artist/albums?id=0");
+      assert.equal(status, 400); // validation happens before any upstream call
+    });
+  });
+
+  test("artist albums missing id -> 400", async () => {
+    await withServer(makeApp(), async (base) => {
+      const { status, body } = await getJson(base, "/api/artist/albums");
+      assert.equal(status, 400);
+      assert.equal(body.code, 400);
+    });
+  });
+
+  test("album detail returns metadata plus normalized songs", async () => {
+    await withServer(makeApp(), async (base) => {
+      const { status, body } = await getJson(base, "/api/album/detail?id=18879");
+      assert.equal(status, 200);
+      assert.equal(body.id, 18879);
+      assert.equal(body.name, "叶惠美");
+      assert.equal(body.coverImgUrl, "https://p.music.163.com/cover.jpg");
+      assert.equal(body.publishTime, 1056969600000);
+      assert.deepEqual(body.songs, [
+        {
+          id: 185811,
+          name: "以父之名",
+          artists: [{ id: 42, name: "周杰伦" }],
+          album: { id: 18879, name: "叶惠美" },
+          duration: 342000,
+          fee: 0,
+        },
+      ]);
+    });
+  });
+
+  test("album detail missing id -> 400", async () => {
+    await withServer(makeApp(), async (base) => {
+      const { status } = await getJson(base, "/api/album/detail");
+      assert.equal(status, 400);
+    });
+  });
+});
+
 describe("song url (VIP / copyright responses)", () => {
   test("upstream returning null url stays 200 with url:null", async () => {
     await withServer(makeApp(), async (base) => {
@@ -205,6 +285,14 @@ describe("misc routes", () => {
       const { status, body } = await getJson(base, "/api/health");
       assert.equal(status, 200);
       assert.equal(body.ok, true);
+    });
+  });
+
+  test("hot search trims keywords and drops empties", async () => {
+    await withServer(makeApp(), async (base) => {
+      const { status, body } = await getJson(base, "/api/search/hot");
+      assert.equal(status, 200);
+      assert.deepEqual(body.hots, ["周杰伦", "林俊杰"]);
     });
   });
 

@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">HH音乐</string>
+
+    <!-- v1.7: home-screen player widget -->
+    <string name="widget_desc">播放控制小组件</string>
+    <string name="widget_art_desc">专辑封面</string>
+    <string name="widget_prev_desc">上一首</string>
+    <string name="widget_toggle_desc">播放/暂停</string>
+    <string name="widget_next_desc">下一首</string>
 </resources>
 

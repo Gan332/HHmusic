@@ -3,9 +3,12 @@ package com.hh.music.player.ui.search
 import com.hh.music.player.data.MusicRepository
 import com.hh.music.player.data.SearchResponse
 import com.hh.music.player.data.Song
+import com.hh.music.player.data.AlbumDetail
 import com.hh.music.player.network.ArtistSongsResponse
+import com.hh.music.player.network.ArtistAlbumsResponse
 import com.hh.music.player.network.ArtistSearchResponse
 import com.hh.music.player.network.HHMusicApi
+import com.hh.music.player.network.HotSearchResponse
 import com.hh.music.player.network.LikeBody
 import com.hh.music.player.network.LikeResponse
 import com.hh.music.player.network.RecommendPlaylistResponse
@@ -52,6 +55,10 @@ class SearchViewModelTest {
             throw UnsupportedOperationException()
         override suspend fun searchArtists(keyword: String, limit: Int, offset: Int): ArtistSearchResponse =
             ArtistSearchResponse()
+        override suspend fun artistAlbums(id: Long, limit: Int, offset: Int): ArtistAlbumsResponse =
+            ArtistAlbumsResponse()
+        override suspend fun albumDetail(id: Long): AlbumDetail = throw UnsupportedOperationException()
+        override suspend fun hotSearch(): HotSearchResponse = HotSearchResponse()
         override suspend fun newSongs(limit: Int) = throw UnsupportedOperationException()
     }
 

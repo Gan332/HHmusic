@@ -67,6 +67,43 @@ object DirectNcmClient {
         }
     }
 
+    /** Body plus Set-Cookie headers — needed by the QR-login poll (code 803 carries the session). */
+    class HttpTextResponse(val body: String, val setCookies: List<String>)
+
+    fun apiPostWithResponse(pathUnderApi: String, fields: Map<String, String>): HttpTextResponse {
+        val url = HOST + "/api/" + pathUnderApi.trimStart('/')
+        val builder = FormBody.Builder()
+        fields.forEach { (k, v) -> builder.add(k, v) }
+        val req = Request.Builder()
+            .url(url)
+            .post(builder.build())
+            .header("User-Agent", UA)
+            .header("Referer", HOST + "/")
+            .header("Cookie", cookieOrEmpty())
+            .header("X-Real-IP", "220.181.108.0")
+            .build()
+        client.newCall(req).execute().use { res ->
+            val body = res.body?.string() ?: throw Exception("empty api response")
+            return HttpTextResponse(body, res.headers("Set-Cookie"))
+        }
+    }
+
+    /** Plain GET to /api/<path> (e.g. v1/album/{id}) with NetEase-friendly headers. */
+    fun apiGet(pathUnderApi: String): String {
+        val url = HOST + "/api/" + pathUnderApi.trimStart('/')
+        val req = Request.Builder()
+            .url(url)
+            .get()
+            .header("User-Agent", UA)
+            .header("Referer", HOST + "/")
+            .header("Cookie", cookieOrEmpty())
+            .header("X-Real-IP", "220.181.108.0")
+            .build()
+        client.newCall(req).execute().use { res ->
+            return res.body?.string() ?: throw Exception("empty api response")
+        }
+    }
+
     /** Public (no-login) playable URL — the Ncrust outer-url fallback. */
     fun outerUrl(songId: Long): String =
         HOST + "/song/media/outer/url?id=$songId.mp3"

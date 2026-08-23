@@ -282,6 +282,15 @@ class DownloadManager(
         val target = File(downloadsDir, fileName)
         target.delete()
         if (!tmp.renameTo(target)) throw Exception("保存文件失败")
+        // v1.7: tag MP3s with title/artist/album so local-music listings and
+        // external players show proper metadata. Best-effort — never fails the
+        // download, and only MP3 (ID3) is touched.
+        runCatching {
+            val ext = target.extension
+            if (MediaTagWriter.supports(ext) && !MediaTagWriter.hasId3(target)) {
+                MediaTagWriter.writeId3v2(target, song)
+            }
+        }
         return DownloadEntry(
             song = song,
             fileName = fileName,

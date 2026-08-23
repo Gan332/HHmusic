@@ -12,7 +12,13 @@ import {
   getRecommendSongs,
   getRecommendPlaylists,
   getArtistSongs,
+  getArtistAlbums,
+  getAlbumDetail,
+  getHotSearches,
   getNewSongs,
+  getPlaylistCatlist,
+  getTopPlaylists,
+  getPersonalFm,
   likeSong,
   pingUpstream,
 } from "./netease.js";
@@ -40,7 +46,13 @@ export function createApp(deps = {}) {
     getRecommendSongs,
     getRecommendPlaylists,
     getArtistSongs,
+    getArtistAlbums,
+    getAlbumDetail,
+    getHotSearches,
     getNewSongs,
+    getPlaylistCatlist,
+    getTopPlaylists,
+    getPersonalFm,
     likeSong,
     ...deps,
   };
@@ -314,6 +326,50 @@ export function createApp(deps = {}) {
   );
 
   app.get(
+    "/api/artist/albums",
+    asyncHandler(async (req, res) => {
+      const id = toInt(req.query.id, 0);
+      if (!id) return res.status(400).json({ code: 400, msg: "missing id" });
+      const limit = limitParam(req.query.limit, 50);
+      const offset = Math.max(0, toInt(req.query.offset, 0));
+      const r = await api.getArtistAlbums(id, limit, offset);
+      const albums = (r.data?.hotAlbums ?? []).map((a) => ({
+        id: a.id,
+        name: a.name,
+        picUrl: a.picUrl ?? a.blurPicUrl ?? null,
+        publishTime: a.publishTime ?? 0,
+        songCount: a.size ?? 0,
+      }));
+      sendResult(res, {
+        status: 200,
+        data: { code: 200, more: r.data?.more ?? false, hotAlbums: albums },
+      });
+    })
+  );
+
+  app.get(
+    "/api/album/detail",
+    asyncHandler(async (req, res) => {
+      const id = toInt(req.query.id, 0);
+      if (!id) return res.status(400).json({ code: 400, msg: "missing id" });
+      const r = await api.getAlbumDetail(id);
+      const d = r.data ?? {};
+      sendResult(res, {
+        status: 200,
+        data: {
+          code: 200,
+          id: d.album?.id ?? id,
+          name: d.album?.name ?? "",
+          coverImgUrl: d.album?.picUrl ?? null,
+          description: d.album?.description ?? null,
+          publishTime: d.album?.publishTime ?? 0,
+          songs: normalizeSongsFrom(d.songs),
+        },
+      });
+    })
+  );
+
+  app.get(
     "/api/new/song",
     asyncHandler(async (req, res) => {
       const limit = limitParam(req.query.limit, 30);
@@ -322,6 +378,72 @@ export function createApp(deps = {}) {
         (r.data?.result ?? r.data?.data ?? []).map((it) => it.song ?? it)
       );
       sendResult(res, { status: 200, data: { code: 200, songs: items } });
+    })
+  );
+
+  app.get(
+    "/api/search/hot",
+    asyncHandler(async (_req, res) => {
+      const r = await api.getHotSearches();
+      const hots = (r.data?.result?.hots ?? [])
+        .map((h) => (h?.first ?? "").toString().trim())
+        .filter(Boolean);
+      sendResult(res, { status: 200, data: { code: 200, hots } });
+    })
+  );
+
+  // v1.7: playlist plaza — category list + hot/new playlists per category.
+  app.get(
+    "/api/playlist/catlist",
+    asyncHandler(async (_req, res) => {
+      const r = await api.getPlaylistCatlist();
+      const subs = (r.data?.sub ?? []).map((c) => ({
+        name: c.name,
+        category: c.category,
+        hot: c.hot ?? false,
+      }));
+      const categories = Object.entries(r.data?.categories ?? {}).map(([k, v]) => ({
+        id: Number(k),
+        name: v,
+      }));
+      sendResult(res, {
+        status: 200,
+        data: { code: 200, categories, sub: subs },
+      });
+    })
+  );
+
+  app.get(
+    "/api/top/playlist",
+    asyncHandler(async (req, res) => {
+      const cat = (req.query.cat ?? "全部").toString();
+      const limit = limitParam(req.query.limit, 30);
+      const offset = Math.max(0, toInt(req.query.offset, 0));
+      const order = (req.query.order ?? "hot").toString() === "new" ? "new" : "hot";
+      const r = await api.getTopPlaylists(cat, limit, offset, order);
+      const list = (r.data?.playlists ?? []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        picUrl: p.coverImgUrl ?? p.picUrl ?? null,
+        playcount: p.playcount ?? p.playCount ?? 0,
+        creator: { nickname: (p.creator ?? {}).nickname },
+      }));
+      sendResult(res, {
+        status: 200,
+        data: { code: 200, total: r.data?.total ?? 0, more: r.data?.more ?? false, list },
+      });
+    })
+  );
+
+  // v1.7: personal FM — a small batch of songs for radio-style playback.
+  app.get(
+    "/api/personal/fm",
+    asyncHandler(async (_req, res) => {
+      const r = await api.getPersonalFm();
+      sendResult(res, {
+        status: 200,
+        data: { code: 200, songs: normalizeSongsFrom(r.data?.data) },
+      });
     })
   );
 

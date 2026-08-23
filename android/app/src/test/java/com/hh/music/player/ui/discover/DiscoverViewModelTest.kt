@@ -74,6 +74,12 @@ class DiscoverViewModelTest {
             throw UnsupportedOperationException()
         override suspend fun searchArtists(keyword: String, limit: Int, offset: Int): ArtistSearchResponse =
             throw UnsupportedOperationException()
+        override suspend fun artistAlbums(id: Long, limit: Int, offset: Int): com.hh.music.player.network.ArtistAlbumsResponse =
+            throw UnsupportedOperationException()
+        override suspend fun albumDetail(id: Long): com.hh.music.player.data.AlbumDetail =
+            throw UnsupportedOperationException()
+        override suspend fun hotSearch(): com.hh.music.player.network.HotSearchResponse =
+            throw UnsupportedOperationException()
     }
 
     private fun section(tag: String) = Song(

@@ -25,7 +25,8 @@ data class SearchState(
     val total: Int = 0,
     val loadingMore: Boolean = false,
     val loadMoreError: String? = null,
-    val artists: List<Artist> = emptyList()
+    val artists: List<Artist> = emptyList(),
+    val hotSearches: List<String> = DEFAULT_HOT_SEARCHES
 ) {
     val hasMore: Boolean get() = results.isNotEmpty() && results.size < total
 }
@@ -42,8 +43,25 @@ class SearchViewModel(
     /** Monotonic request id; only the newest search may update the state. */
     private var searchSeq = 0
 
+    init {
+        loadHotSearches()
+    }
+
+    /** Replace the built-in fallback list with real NetEase hot keywords when available. */
+    private fun loadHotSearches() {
+        viewModelScope.launch {
+            repository.hotSearches()
+                .onSuccess { words ->
+                    if (words.isNotEmpty()) _state.update { it.copy(hotSearches = words) }
+                }
+        }
+    }
+
     companion object {
         private const val PAGE_SIZE = 30
+
+        /** Offline/static fallback shown until (or if) real hot keywords arrive. */
+        val DEFAULT_HOT_SEARCHES = listOf("周杰伦", "林俊杰", "陈奕迅", "许嵩", "毛不易", "邓紫棋")
     }
 
     fun onQueryChange(q: String) {

@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.hh.music.player.playback.PlayerController
 
 /** Compact now-playing bar that floats above the content on list screens. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MiniPlayerBar(
     player: PlayerController,
@@ -90,7 +91,7 @@ fun MiniPlayerBar(
                 }
                 if (current.duration > 0) {
                     val progress by player.positionMs.collectAsState()
-                    LinearProgressIndicator(
+                    LinearWavyProgressIndicator(
                         progress = { (progress.toFloat() / current.duration).coerceIn(0f, 1f) },
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                         trackColor = MaterialTheme.colorScheme.surfaceContainerHighest

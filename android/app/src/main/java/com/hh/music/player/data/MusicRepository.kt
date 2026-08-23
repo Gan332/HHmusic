@@ -30,12 +30,15 @@ import org.json.JSONObject
 class MusicRepository(
     private val api: HHMusicApi = NetworkModule.api,
     private val local: LocalStore? = null,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+    val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
 
     /** Runtime flags, kept in sync with [LocalStore] by [AppContainer]. */
     @Volatile var useBackend: Boolean = false
     @Volatile var audioQuality: String = "exhigh"
+
+    /** True when a MUSIC_U login token is loaded (direct mode only). */
+    @Volatile var hasLoginCookie: Boolean = false
 
     companion object {
         private const val TAG = "HHMusicRepo"
@@ -44,8 +47,7 @@ class MusicRepository(
     // Small in-memory LRU caches: lyrics are re-opened every time you re-visit the
     // player screen, and search results are re-fetched on every keystroke debounce.
     private val lyricCache = LruCache<Long, Lyric>(30)
-    private val searchCache = LruCache<SearchCacheKey, SearchPage>(30)
-
+    private val searchCache = LruCache<SearchCacheKey, SearchPage>(30)    private val plazaCache = LruCache<PlazaCacheKey, PlaylistPlazaPage>(20)
     // ---------------- direct (NetEase) implementations ----------------
 
     suspend fun search(keyword: String, limit: Int = 30, offset: Int = 0): Result<SearchPage> =
@@ -86,6 +88,26 @@ class MusicRepository(
                     )
                     val body = DirectNcmClient.apiPost("cloudsearch/pc", fields)
                     NcmParser.artistSearchPage(JSONObject(body))
+                }
+            }
+        }
+
+    /** Real-time hot search keywords; callers fall back to a static list when empty. */
+    suspend fun hotSearches(limit: Int = 12): Result<List<String>> =
+        runCatching {
+            withContext(ioDispatcher) {
+                if (useBackend) {
+                    api.hotSearch().hots.take(limit)
+                } else {
+                    val body = DirectNcmClient.apiPost("search/hot", mapOf("type" to "1111"))
+                    val hots = JSONObject(body).optJSONObject("result")?.optJSONArray("hots") ?: JSONArray()
+                    val out = ArrayList<String>(hots.length())
+                    for (i in 0 until hots.length()) {
+                        if (out.size >= limit) break
+                        val word = hots.optJSONObject(i)?.optString("first").orEmpty().trim()
+                        if (word.isNotEmpty()) out += word
+                    }
+                    out
                 }
             }
         }
@@ -251,6 +273,45 @@ class MusicRepository(
     suspend fun artistSongs(id: Long, limit: Int = 50, offset: Int = 0, order: String = "hot"): Result<List<Song>> =
         artistSongsPage(id, limit, offset, order).map { it.songs }
 
+    /**
+     * Push a favorite toggle to the cloud (direct mode + logged in only —
+     * callers gate via [CloudSync]). Requires the MUSIC_U cookie.
+     */
+    suspend fun likeSong(songId: Long, like: Boolean): Result<Unit> =
+        com.hh.music.player.network.LoginClient.like(songId, like, ioDispatcher)
+
+    /** Paged album list for an artist. Direct path uses eapi `artist/albums`. */
+    suspend fun artistAlbumsPage(id: Long, limit: Int = 50, offset: Int = 0): Result<ArtistAlbumsPage> =
+        runCatching {
+            withContext(ioDispatcher) {
+                if (useBackend) {
+                    val resp = api.artistAlbums(id, limit, offset)
+                    ArtistAlbumsPage(albums = resp.albums, more = resp.more)
+                } else {
+                    val payload = mapOf<String, Any>(
+                        "id" to id.toString(),
+                        "limit" to limit.toString(),
+                        "offset" to offset.toString()
+                    )
+                    val body = DirectNcmClient.eapiPost("artist/albums", payload)
+                    NcmParser.artistAlbumsPage(JSONObject(body))
+                }
+            }
+        }
+
+    /** Album metadata + full track list. Direct path uses plain `/api/v1/album/{id}`. */
+    suspend fun albumDetail(id: Long): Result<AlbumDetail> =
+        runCatching {
+            withContext(ioDispatcher) {
+                if (useBackend) {
+                    api.albumDetail(id)
+                } else {
+                    val body = DirectNcmClient.apiGet("v1/album/$id")
+                    NcmParser.albumDetail(JSONObject(body))
+                }
+            }
+        }
+
     suspend fun newSongs(limit: Int = 30): Result<List<Song>> = runCatching {
         withContext(ioDispatcher) {
             if (useBackend) {
@@ -268,11 +329,94 @@ class MusicRepository(
             }
         }
     }
+
+    // ---------------- v1.7: playlist plaza ----------------
+
+    /** All playlist categories (chips row on the plaza screen). */
+    suspend fun playlistCategories(): Result<List<PlazaCategory>> = runCatching {
+        withContext(ioDispatcher) {
+            if (useBackend) {
+                val resp = api.playlistCatlist()
+                resp.sub.map { PlazaCategory(it.category, it.name) }.distinctBy { it.name }
+            } else {
+                NcmParser.plazaCategories(JSONObject(DirectNcmClient.apiPost("playlist/catlist", emptyMap())))
+            }
+        }
+    }
+
+    /**
+     * One page of the playlist plaza. `order` is "hot" or "new"; paging via offset.
+     * Results are cached per (cat, order, limit, offset) like search.
+     */
+    suspend fun topPlaylists(cat: String, limit: Int = 30, offset: Int = 0, order: String = "hot"): Result<PlaylistPlazaPage> =
+        runCatching {
+            val key = PlazaCacheKey(cat, order, limit, offset)
+            plazaCache[key]?.let { return@runCatching it }
+            val page = withContext(ioDispatcher) {
+                if (useBackend) {
+                    val resp = api.topPlaylists(cat, limit, offset, order)
+                    PlaylistPlazaPage(
+                        list = resp.list.map {
+                            PlazaPlaylist(
+                                id = it.id,
+                                name = it.name,
+                                picUrl = it.picUrl,
+                                playcount = it.playcount,
+                                creator = it.creator
+                            )
+                        },
+                        total = resp.total,
+                        more = resp.more
+                    )
+                } else {
+                    val fields = mapOf(
+                        "cat" to cat,
+                        "limit" to limit.toString(),
+                        "offset" to offset.toString(),
+                        "order" to order
+                    )
+                    NcmParser.playlistPlazaPage(JSONObject(DirectNcmClient.apiPost("top/playlist", fields)))
+                }
+            }
+            plazaCache[key] = page
+            page
+        }
+
+    // ---------------- v1.7: personal FM ----------------
+
+    /**
+     * Personal FM: returns a batch of songs to play. Direct mode uses the plain
+     * api path; backend mode proxies through /api/personal/fm.
+     */
+    suspend fun personalFm(): Result<List<Song>> = runCatching {
+        withContext(ioDispatcher) {
+            if (useBackend) {
+                api.personalFm().songs
+            } else {
+                val body = DirectNcmClient.apiPost("personal_fm", mapOf("limit" to "6"))
+                val dataArr = JSONObject(body).optJSONArray("data") ?: JSONArray()
+                val out = ArrayList<Song>(dataArr.length())
+                for (i in 0 until dataArr.length()) {
+                    val s = dataArr.optJSONObject(i) ?: continue
+                    out += NcmParser.toSong(s)
+                }
+                out
+            }
+        }
+    }
 }
 
 /** Cache key for search results: paging parameters are part of the identity. */
 data class SearchCacheKey(
     val keyword: String,
+    val limit: Int,
+    val offset: Int
+)
+
+/** Cache key for playlist plaza pages. */
+data class PlazaCacheKey(
+    val cat: String,
+    val order: String,
     val limit: Int,
     val offset: Int
 )
@@ -285,6 +429,7 @@ class AppContainer(context: Context) {
     val equalizerController: EqualizerController = EqualizerController(localStore)
     val playerController: PlayerController =
         PlayerController(context.applicationContext, repository, localStore, downloadManager)
+    val cloudSync: CloudSync = CloudSync(repository, scope)
 
     // Keep the repository runtime flags in sync with persisted user settings.
     private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
@@ -301,6 +446,13 @@ class AppContainer(context: Context) {
     init {
         scope.launch { localStore.useBackend.collect { repository.useBackend = it } }
         scope.launch { localStore.audioQuality.collect { repository.audioQuality = it } }
+        // Restore the login session (MUSIC_U) and keep the flag in sync for CloudSync.
+        scope.launch {
+            localStore.loginCookie.collect { token ->
+                DirectNcmClient.setCookie(token.takeIf { it.isNotBlank() }?.let { "MUSIC_U=$it" })
+                repository.hasLoginCookie = token.isNotBlank()
+            }
+        }
     }
 }
 

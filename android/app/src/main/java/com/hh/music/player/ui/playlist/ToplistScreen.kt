@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package com.hh.music.player.ui.playlist
 
 import androidx.compose.foundation.background
@@ -59,7 +61,7 @@ fun ToplistScreen(
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when {
                 state.loading && state.toplists.isEmpty() ->
-                    CircularProgressIndicator(Modifier.align(Alignment.Center))
+                    LoadingIndicator(Modifier.align(Alignment.Center))
                 state.error != null -> ErrorState(
                     message = state.error.orEmpty(),
                     onRetry = vm::refresh,

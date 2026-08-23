@@ -100,6 +100,36 @@ data class ArtistSongsPage(
     val total: Int = 0
 )
 
+/** One album row on an artist page (from /artist/albums hotAlbums). */
+@Serializable
+data class AlbumItem(
+    val id: Long = 0,
+    val name: String = "",
+    val picUrl: String? = null,
+    /** Publish timestamp in epoch milliseconds; 0 when unknown. */
+    val publishTime: Long = 0L,
+    val songCount: Int = 0
+)
+
+/** One page of an artist's albums (paging via `more`). */
+@Serializable
+data class ArtistAlbumsPage(
+    val albums: List<AlbumItem> = emptyList(),
+    val more: Boolean = false
+)
+
+/** Full album detail: metadata + full track list. */
+@Serializable
+data class AlbumDetail(
+    val id: Long = 0,
+    val name: String = "",
+    @SerialName("coverImgUrl") val coverImgUrl: String? = null,
+    val description: String? = null,
+    /** Publish timestamp in epoch milliseconds; 0 when unknown. */
+    val publishTime: Long = 0L,
+    val songs: List<Song> = emptyList()
+)
+
 @Serializable
 data class SearchResponse(
     val code: Int = 0,
@@ -132,4 +162,31 @@ data class ToplistItem(
     @SerialName("coverImgUrl") val coverImgUrl: String? = null,
     val description: String? = null,
     @SerialName("updateFrequency") val updateFrequency: String? = null
+)
+
+/** v1.7: one playlist card on the playlist plaza (top/playlist rows). */
+@Serializable
+data class PlazaPlaylist(
+    val id: Long = 0,
+    val name: String = "",
+    val picUrl: String? = null,
+    val playcount: Long = 0,
+    val creator: Creator? = null
+) {
+    val creatorName: String get() = creator?.nickname ?: ""
+}
+
+/** One page of the playlist plaza (paging via `more`). */
+@Serializable
+data class PlaylistPlazaPage(
+    val list: List<PlazaPlaylist> = emptyList(),
+    val total: Int = 0,
+    val more: Boolean = false
+)
+
+/** v1.7: playlist plaza category (from /playlist/catlist). */
+@Serializable
+data class PlazaCategory(
+    val id: Int = 0,
+    val name: String = ""
 )

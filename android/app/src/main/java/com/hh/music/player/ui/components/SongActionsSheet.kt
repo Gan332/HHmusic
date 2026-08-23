@@ -41,6 +41,7 @@ fun SongActionsSheet(
     val player = LocalPlayerController.current
     val store = LocalStoreProvider.current
     val downloadManager = LocalDownloadManager.current
+    val cloudSync = com.hh.music.player.ui.LocalCloudSync.current
     val scope = rememberCoroutineScope()
 
     val favorites by store.favorites.collectAsState(initial = emptyList())
@@ -118,7 +119,11 @@ fun SongActionsSheet(
                 },
                 label = if (isFav) "取消收藏" else "收藏",
                 onClick = {
-                    scope.launch { store.toggleFavorite(song) }
+                    val willLike = !isFav
+                    scope.launch {
+                        store.toggleFavorite(song)
+                        cloudSync.pushLike(song.id, willLike)
+                    }
                     onDismiss()
                 }
             )

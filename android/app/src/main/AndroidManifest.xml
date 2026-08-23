@@ -44,6 +44,22 @@
                 <action android:name="androidx.media3.session.MediaSessionService" />
             </intent-filter>
         </service>
+
+        <!-- v1.7: home-screen player widget -->
+        <receiver
+            android:name=".playback.PlayerWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.hh.music.player.widget.TOGGLE" />
+                <action android:name="com.hh.music.player.widget.NEXT" />
+                <action android:name="com.hh.music.player.widget.PREV" />
+                <action android:name="com.hh.music.player.widget.REFRESH_STATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_player_info" />
+        </receiver>
     </application>
 
 </manifest>

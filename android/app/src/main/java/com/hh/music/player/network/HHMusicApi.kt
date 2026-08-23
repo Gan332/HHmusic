@@ -1,6 +1,7 @@
 package com.hh.music.player.network
 
 import com.hh.music.player.data.Lyric
+import com.hh.music.player.data.AlbumDetail
 import com.hh.music.player.data.Artist
 import com.hh.music.player.data.Playlist
 import com.hh.music.player.data.SearchResponse
@@ -65,8 +66,37 @@ interface HHMusicApi {
         @Query("offset") offset: Int = 0
     ): ArtistSearchResponse
 
+    @GET("artist/albums")
+    suspend fun artistAlbums(
+        @Query("id") id: Long,
+        @Query("limit") limit: Int = 50,
+        @Query("offset") offset: Int = 0
+    ): ArtistAlbumsResponse
+
+    @GET("album/detail")
+    suspend fun albumDetail(@Query("id") id: Long): AlbumDetail
+
+    @GET("search/hot")
+    suspend fun hotSearch(): HotSearchResponse
+
     @GET("new/song")
     suspend fun newSongs(@Query("limit") limit: Int = 30): SongDetailResponse
+
+    // ---- v1.7: playlist plaza ----
+    @GET("playlist/catlist")
+    suspend fun playlistCatlist(): PlaylistCatlistResponse
+
+    @GET("top/playlist")
+    suspend fun topPlaylists(
+        @Query("cat") cat: String = "全部",
+        @Query("limit") limit: Int = 30,
+        @Query("offset") offset: Int = 0,
+        @Query("order") order: String = "hot"
+    ): TopPlaylistResponse
+
+    // ---- v1.7: personal FM ----
+    @GET("personal/fm")
+    suspend fun personalFm(): SongDetailResponse
 }
 
 @Serializable
@@ -107,3 +137,48 @@ data class ArtistSearchResponse(
     val total: Int = 0,
     val artists: List<Artist> = emptyList()
 )
+
+@Serializable
+data class ArtistAlbumsResponse(
+    val code: Int = 0,
+    val more: Boolean = false,
+    @SerialName("hotAlbums") val albums: List<com.hh.music.player.data.AlbumItem> = emptyList()
+)
+
+@Serializable
+data class HotSearchResponse(val code: Int = 0, val hots: List<String> = emptyList())
+
+// ---- v1.7: playlist plaza ----
+
+@Serializable
+data class PlaylistCatlistResponse(
+    val code: Int = 0,
+    val categories: Map<String, String> = emptyMap(),
+    val sub: List<PlazaCategoryDto> = emptyList()
+)
+
+@Serializable
+data class PlazaCategoryDto(
+    val name: String = "",
+    val category: Int = -1,
+    val hot: Boolean = false
+)
+
+@Serializable
+data class TopPlaylistResponse(
+    val code: Int = 0,
+    val total: Int = 0,
+    val more: Boolean = false,
+    val list: List<PlazaPlaylistDto> = emptyList()
+)
+
+@Serializable
+data class PlazaPlaylistDto(
+    val id: Long = 0,
+    val name: String = "",
+    @SerialName("picUrl") val picUrl: String? = null,
+    val playcount: Long = 0,
+    val creator: com.hh.music.player.data.Creator? = null
+) {
+    val coverUrl: String get() = picUrl.orEmpty()
+}

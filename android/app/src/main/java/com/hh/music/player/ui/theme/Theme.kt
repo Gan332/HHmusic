@@ -3,7 +3,9 @@ package com.hh.music.player.ui.theme
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
@@ -184,6 +186,7 @@ private val ExpressiveShapes = Shapes(
     extraLarge = RoundedCornerShape(28.dp)
 )
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun HHMusicTheme(
     themeMode: AppThemeMode = AppThemeMode.SYSTEM,
@@ -210,6 +213,8 @@ fun HHMusicTheme(
         colorScheme = colors,
         shapes = ExpressiveShapes,
         typography = MaterialTheme.typography,
+        // M3E 弹性动效：所有 M3 组件的默认动画统一走 expressive spring 曲线。
+        motionScheme = MotionScheme.expressive(),
         content = content
     )
 }

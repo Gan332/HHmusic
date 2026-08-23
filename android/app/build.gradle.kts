@@ -13,8 +13,8 @@ android {
         applicationId = "com.hh.music.player"
         minSdk = 24
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.6"
+        versionCode = 7
+        versionName = "1.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -90,4 +90,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation("org.json:json:20240303")
+
+    // QR rendering for NetEase login (core only — no camera/scanner)
+    implementation("com.google.zxing:core:3.5.3")
 }

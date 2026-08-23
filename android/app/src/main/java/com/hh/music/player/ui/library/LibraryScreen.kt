@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package com.hh.music.player.ui.library
 
 import android.content.Intent
@@ -349,6 +351,7 @@ private fun SongListPane(
  * 下载页签：已下载文件（点选即播、删除）、失败记录（原因 + 重试）、
  * 下载中进度、总占用 / 容量上限、清空缓存。
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun DownloadsPane(
     downloadManager: DownloadManager,
@@ -425,7 +428,7 @@ private fun DownloadsPane(
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(song.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            LinearProgressIndicator(
+                            LinearWavyProgressIndicator(
                                 progress = { st.progress / 100f },
                                 modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
                             )
@@ -694,7 +697,7 @@ private fun LocalMusicPane(
         when {
             scanning && songs.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator()
+                    LoadingIndicator()
                     Spacer(Modifier.height(12.dp))
                     Text("扫描中…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

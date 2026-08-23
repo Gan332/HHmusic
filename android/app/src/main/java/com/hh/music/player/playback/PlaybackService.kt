@@ -30,10 +30,28 @@ class PlaybackService : MediaSessionService() {
                 /* handleAudioFocus = */ true
             )
             .setHandleAudioBecomingNoisy(true)
+            // Keep the CPU awake while the screen is off (WAKE_LOCK is declared
+            // in the manifest); WAKE_MODE_NONE (the default) lets playback stall
+            // during lock-screen listening on some devices.
+            .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
 
-        // Mount the equalizer on the player's actual audio session.
-        AppContainer.instance?.equalizerController?.attachTo(player.audioSessionId)
+        // ExoPlayer only assigns its real audio session id when the audio sink is
+        // created on first playback; at service-creation time it is still
+        // C.AUDIO_SESSION_ID_UNSET (0). Attaching the equalizer then would either
+        // fail outright or bind to the global output mix (affecting ALL audio on
+        // the device), so we attach on the session-id change callback instead and
+        // re-attach whenever the id changes (e.g. after an audio-track reset).
+        player.addListener(object : Player.Listener {
+            override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                val eq = AppContainer.instance?.equalizerController ?: return
+                if (audioSessionId != C.AUDIO_SESSION_ID_UNSET) {
+                    eq.attachTo(audioSessionId)
+                } else {
+                    eq.detach()
+                }
+            }
+        })
 
         val sessionActivityPendingIntent =
             PendingIntent.getActivity(
@@ -47,8 +65,28 @@ class PlaybackService : MediaSessionService() {
             .build()
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
-        mediaSession
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
+        // Only our own app (same UID) and trusted system/assistant controllers may
+        // drive playback — arbitrary third-party apps must not pause/skip/query.
+        return if (controllerInfo.isTrusted) mediaSession else null
+    }
+
+    /**
+     * Explicit task-removal decision: while a track is actually playing or
+     * buffering we keep the foreground service alive so lock-screen playback
+     * survives the swipe-away; when nothing is actively playing we tear the
+     * service down instead of letting it linger.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        val player = mediaSession?.player
+        val activelyPlaying = player != null &&
+            (player.playbackState == Player.STATE_READY || player.playbackState == Player.STATE_BUFFERING) &&
+            player.playWhenReady
+        if (!activelyPlaying) {
+            player?.pause()
+            stopSelf()
+        }
+    }
 
     override fun onDestroy() {
         AppContainer.instance?.equalizerController?.detach()

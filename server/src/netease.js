@@ -21,7 +21,11 @@ const ENDPOINTS = {
   recommendPlaylists: "/personalized/playlist",
   artistSongs: "/v1/artist/songs",
   newSong: "/personalized/newsong",
-  artistDetail: "/artist/desc",
+  // v1.7: playlist plaza (category list + hot playlists by category)
+  playlistCatlist: "/playlist/catlist",
+  topPlaylist: "/top/playlist",
+  // v1.7: personal FM
+  personalFm: "/personal_fm",
 };
 
 /** Network-ish failures worth retrying (fetch throws, timeouts, 5xx, 429). */
@@ -34,10 +38,10 @@ function isRetryable(result) {
   );
 }
 
-async function neteaseRequest(type, payload, extraHeaders = {}, { retries = MAX_RETRIES, retry = true } = {}) {
+async function neteaseRequest(type, payload, extraHeaders = {}, { retries = MAX_RETRIES, retry = true, plain = false } = {}) {
   const path = ENDPOINTS[type] ?? type;
-  const url = NETEASE_BASE + path;
-  const body = weapi(payload);
+  const url = plain ? "https://music.163.com/api" + path : NETEASE_BASE + path;
+  const body = plain ? payload : weapi(payload);
   const headers = {
     "Content-Type": "application/x-www-form-urlencoded",
     "User-Agent":
@@ -149,8 +153,43 @@ export async function getArtistSongs(id, limit = 50, offset = 0, order = "hot") 
   });
 }
 
+/** Artist discography: weapi POST /weapi/artist/albums/{id} → {hotAlbums, more}. */
+export async function getArtistAlbums(id, limit = 50, offset = 0) {
+  return neteaseRequest(`/artist/albums/${id}`, { limit, offset, total: true });
+}
+
+/** Album detail: plain POST /api/v1/album/{id} → {album, songs}. */
+export async function getAlbumDetail(id) {
+  return neteaseRequest(`/v1/album/${id}`, { total: true }, {}, { plain: true });
+}
+
+/** Real-time hot search keywords: weapi POST /weapi/search/hot {type: 1111}. */
+export async function getHotSearches(type = 1111) {
+  return neteaseRequest("/search/hot", { type });
+}
+
 export async function getNewSongs(limit = 30) {
   return neteaseRequest("newSong", { type: 0, areaId: 0, limit });
+}
+
+/* ----- v1.7: playlist plaza ----- */
+
+/** All playlist categories: weapi POST /weapi/playlist/catlist → {sub, categories}. */
+export async function getPlaylistCatlist() {
+  return neteaseRequest("playlistCatlist", {});
+}
+
+/**
+ * Hot/new playlists by category: weapi POST /weapi/top/playlist.
+ * `cat` "全部" means all genres; `order` is "hot" or "new".
+ */
+export async function getTopPlaylists(cat = "全部", limit = 30, offset = 0, order = "hot") {
+  return neteaseRequest("topPlaylist", { cat, limit, offset, order });
+}
+
+/** Personal FM: weapi POST /weapi/personal_fm → {data: [song...]}. */
+export async function getPersonalFm() {
+  return neteaseRequest("personalFm", {});
 }
 
 /**

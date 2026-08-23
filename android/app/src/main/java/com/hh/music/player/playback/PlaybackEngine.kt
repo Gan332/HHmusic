@@ -94,4 +94,20 @@ object PlaybackEngine {
      * song still exists" before resolving/playing it (stale persisted queues).
      */
     fun indexOfSong(songs: List<Long>, songId: Long): Int = songs.indexOf(songId)
+
+    /**
+     * Fade durations offered by the UI, in seconds. 0 disables fading entirely;
+     * anything else fades the tail of each track out (and the next one in).
+     */
+    val FADE_OPTIONS_SEC = intArrayOf(0, 1, 2, 3, 4, 5, 6)
+
+    /** Whether the fade-out window has been reached for the given progress. */
+    fun shouldStartFade(positionMs: Long, durationMs: Long, fadeDurationSec: Int): Boolean {
+        if (fadeDurationSec <= 0) return false
+        if (durationMs <= 0) return false
+        return positionMs >= durationMs - fadeDurationSec * 1000L
+    }
+
+    /** Linear fade curve: [fraction]=0 → full volume, [fraction]=1 → silence. */
+    fun fadeVolume(fraction: Float): Float = (1f - fraction.coerceIn(0f, 1f)).coerceIn(0f, 1f)
 }

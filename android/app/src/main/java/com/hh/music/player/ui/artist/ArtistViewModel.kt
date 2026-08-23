@@ -2,6 +2,8 @@ package com.hh.music.player.ui.artist
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hh.music.player.data.AlbumItem
+import com.hh.music.player.data.ArtistAlbumsPage
 import com.hh.music.player.data.ArtistSongsPage
 import com.hh.music.player.data.MusicRepository
 import com.hh.music.player.data.Song
@@ -18,20 +20,33 @@ data class ArtistUiState(
     val loadingMore: Boolean = false,
     val error: String? = null,
     val order: String = "hot",
-    val artistName: String = ""
+    val artistName: String = "",
+    val selectedTab: String = TAB_SONGS,
+    val albums: List<AlbumItem> = emptyList(),
+    val albumsLoading: Boolean = false,
+    val albumsError: String? = null,
+    val albumsMore: Boolean = false
 ) {
     val hasMore: Boolean get() = songs.isNotEmpty() && songs.size < total
+
+    companion object {
+        const val TAB_SONGS = "songs"
+        const val TAB_ALBUMS = "albums"
+    }
 }
 
 class ArtistViewModel internal constructor(
     private val pageLoader: suspend (Long, Int, Int, String) -> Result<ArtistSongsPage>,
     private val artistId: Long,
-    private val artistName: String = ""
+    private val artistName: String = "",
+    private val albumLoader: suspend (Long, Int, Int) -> Result<ArtistAlbumsPage> =
+        { _, _, _ -> Result.success(ArtistAlbumsPage()) }
 ) : ViewModel() {
     constructor(repository: MusicRepository, artistId: Long, artistName: String = "") : this(
         { id, limit, offset, order -> repository.artistSongsPage(id, limit, offset, order) },
         artistId,
-        artistName
+        artistName,
+        { id, limit, offset -> repository.artistAlbumsPage(id, limit, offset) }
     )
 
     private val _state = MutableStateFlow(ArtistUiState(artistName = artistName))
@@ -43,8 +58,15 @@ class ArtistViewModel internal constructor(
 
     fun setOrder(order: String) {
         if (order == _state.value.order) return
-        _state.value = ArtistUiState(order = order, artistName = artistName)
+        // Reset only the song-list part; albums/tab selection survive the reload.
+        _state.update { it.copy(songs = emptyList(), total = 0, loading = true, error = null, order = order) }
         load()
+    }
+
+    fun setTab(tab: String) {
+        if (tab == _state.value.selectedTab) return
+        _state.update { it.copy(selectedTab = tab) }
+        if (tab == ArtistUiState.TAB_ALBUMS && _state.value.albums.isEmpty()) loadAlbums()
     }
 
     fun loadMore() {
@@ -73,7 +95,45 @@ class ArtistViewModel internal constructor(
         }
     }
 
+    fun loadMoreAlbums() {
+        val s = _state.value
+        if (s.albumsLoading || !s.albumsMore) return
+        viewModelScope.launch {
+            fetchAlbums(s.albums.size)
+        }
+    }
+
     fun retry() = load()
+
+    fun retryAlbums() {
+        if (_state.value.albumsLoading) return
+        viewModelScope.launch { fetchAlbums(_state.value.albums.size) }
+    }
+
+    private fun loadAlbums() {
+        if (artistId <= 0) {
+            _state.update { it.copy(albumsError = "歌手不存在") }
+            return
+        }
+        viewModelScope.launch { fetchAlbums(0) }
+    }
+
+    private suspend fun fetchAlbums(offset: Int) {
+        _state.update { it.copy(albumsLoading = true, albumsError = null) }
+        albumLoader(artistId, ALBUM_PAGE_SIZE, offset)
+            .onSuccess { page ->
+                _state.update {
+                    it.copy(
+                        albumsLoading = false,
+                        albums = (it.albums + page.albums).distinctBy(AlbumItem::id),
+                        albumsMore = page.more
+                    )
+                }
+            }
+            .onFailure { e ->
+                _state.update { it.copy(albumsLoading = false, albumsError = e.message ?: "专辑加载失败") }
+            }
+    }
 
     private fun load() {
         if (artistId <= 0) {
@@ -107,5 +167,6 @@ class ArtistViewModel internal constructor(
 
     companion object {
         private const val PAGE_SIZE = 50
+        private const val ALBUM_PAGE_SIZE = 50
     }
 }

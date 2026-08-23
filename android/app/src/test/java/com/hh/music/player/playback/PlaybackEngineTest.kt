@@ -155,4 +155,33 @@ class PlaybackEngineTest {
         assertEquals(2, PlaybackEngine.indexAfterMove(currentIndex = 3, from = 1, to = 4))
         assertEquals(5, PlaybackEngine.indexAfterMove(currentIndex = 5, from = 5, to = 5))
     }
+
+    // ---------------- track fade-in/out ----------------
+
+    @Test
+    fun `fade starts only inside the tail window with a known duration`() {
+        val dur = 200_000L
+        // 3s window → last 3000ms.
+        assertTrue(PlaybackEngine.shouldStartFade(positionMs = 197_500L, durationMs = dur, fadeDurationSec = 3))
+        assertFalse(PlaybackEngine.shouldStartFade(positionMs = 196_000L, durationMs = dur, fadeDurationSec = 3))
+        // Exactly at the boundary counts as inside.
+        assertTrue(PlaybackEngine.shouldStartFade(positionMs = dur - 3_000L, durationMs = dur, fadeDurationSec = 3))
+    }
+
+    @Test
+    fun `fade never starts when disabled or duration unknown`() {
+        assertFalse(PlaybackEngine.shouldStartFade(positionMs = 199_000L, durationMs = 200_000L, fadeDurationSec = 0))
+        assertFalse(PlaybackEngine.shouldStartFade(positionMs = 199_000L, durationMs = -1L, fadeDurationSec = 3))
+        assertFalse(PlaybackEngine.shouldStartFade(positionMs = 199_000L, durationMs = 0L, fadeDurationSec = 6))
+    }
+
+    @Test
+    fun `fade volume is linear from full to silence and clamped`() {
+        assertEquals(1f, PlaybackEngine.fadeVolume(0f))
+        assertEquals(0.5f, PlaybackEngine.fadeVolume(0.5f))
+        assertEquals(0f, PlaybackEngine.fadeVolume(1f))
+        // Out-of-range fractions clamp instead of inverting the curve.
+        assertEquals(1f, PlaybackEngine.fadeVolume(-0.5f))
+        assertEquals(0f, PlaybackEngine.fadeVolume(1.5f))
+    }
 }

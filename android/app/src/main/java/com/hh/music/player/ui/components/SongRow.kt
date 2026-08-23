@@ -1,14 +1,23 @@
 package com.hh.music.player.ui.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.StartOffset
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
@@ -89,18 +98,39 @@ Box(
     }
 }
 
-/** Simple animated-ish equalizer indicator (static bars). */
+/** Animated equalizer indicator: three bars bouncing while the song is playing. */
 @Composable
 private fun EqualizerBar(modifier: Modifier = Modifier) {
     val color = MaterialTheme.colorScheme.primary
+    val transition = rememberInfiniteTransition(label = "equalizer")
+    // 三柱相位错开，形成滚动波形感。
+    val phases = listOf(0f, 0.33f, 0.66f)
+    val scales = phases.map { phase ->
+        transition.animateFloat(
+            initialValue = 0.4f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 520, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+                initialStartOffset = StartOffset((phase * 520).toInt())
+            ),
+            label = "bar$phase"
+        )
+    }
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Bottom
     ) {
-        Box(Modifier.width(3.dp).height(8.dp).background(color))
-        Box(Modifier.width(3.dp).height(20.dp).background(color))
-        Box(Modifier.width(3.dp).height(12.dp).background(color))
+        scales.forEach { scale ->
+            Box(
+                Modifier
+                    .width(3.dp)
+                    .height(20.dp)
+                    .graphicsLayer { scaleY = scale.value }
+                    .background(color, RoundedCornerShape(topStart = 1.dp, topEnd = 1.dp))
+            )
+        }
     }
 }
 

@@ -85,4 +85,67 @@ class NcmParserTest {
         assertEquals("夜曲", page.songs[0].name)
         assertTrue(page.songs[0].artists.first().name == "周杰伦")
     }
+
+    @Test
+    fun `artist albums page reads hotAlbums with pic fallback and more flag`() {
+        val root = JSONObject(
+            """
+            {
+              "more": true,
+              "hotAlbums": [
+                {"id": 111, "name": "叶惠美", "picUrl": "https://p.music.163.com/al.jpg", "publishTime": 1056969600000, "size": 11},
+                {"id": 222, "name": "无封面专辑", "blurPicUrl": "https://p.music.163.com/blur.jpg", "publishTime": 0, "size": 10},
+                {"id": 0, "name": "无效项应被丢弃"}
+              ],
+              "artist": {"id": 42, "name": "周杰伦"}
+            }
+            """.trimIndent()
+        )
+
+        val page = NcmParser.artistAlbumsPage(root)
+
+        assertTrue(page.more)
+        assertEquals(2, page.albums.size)
+        assertEquals("叶惠美", page.albums[0].name)
+        assertEquals("https://p.music.163.com/al.jpg", page.albums[0].picUrl)
+        assertEquals(1056969600000L, page.albums[0].publishTime)
+        assertEquals(11, page.albums[0].songCount)
+        assertEquals("https://p.music.163.com/blur.jpg", page.albums[1].picUrl)
+    }
+
+    @Test
+    fun `album detail parses album object and song list`() {
+        val root = JSONObject(
+            """
+            {
+              "album": {
+                "id": 18879,
+                "name": "叶惠美",
+                "picUrl": "https://p.music.163.com/cover.jpg",
+                "publishTime": 1056969600000,
+                "description": "第四张创作专辑"
+              },
+              "songs": [
+                {
+                  "id": 185811,
+                  "name": "以父之名",
+                  "ar": [{"id": 42, "name": "周杰伦"}],
+                  "al": {"id": 18879, "name": "叶惠美"},
+                  "dt": 342000
+                }
+              ]
+            }
+            """.trimIndent()
+        )
+
+        val detail = NcmParser.albumDetail(root)
+
+        assertEquals(18879, detail.id)
+        assertEquals("叶惠美", detail.name)
+        assertEquals("https://p.music.163.com/cover.jpg", detail.coverImgUrl)
+        assertEquals("第四张创作专辑", detail.description)
+        assertEquals(1056969600000L, detail.publishTime)
+        assertEquals(1, detail.songs.size)
+        assertEquals("以父之名", detail.songs[0].name)
+    }
 }

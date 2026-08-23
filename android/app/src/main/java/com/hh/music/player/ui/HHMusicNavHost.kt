@@ -8,11 +8,12 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -30,12 +31,14 @@ import com.hh.music.player.data.offline.DownloadManager
 import com.hh.music.player.playback.EqualizerController
 import com.hh.music.player.playback.PlayerController
 import com.hh.music.player.ui.artist.ArtistScreen
+import com.hh.music.player.ui.album.AlbumScreen
 import com.hh.music.player.ui.library.LibraryScreen
 import com.hh.music.player.ui.settings.SettingsScreen
 import com.hh.music.player.ui.discover.DiscoverScreen
 import com.hh.music.player.ui.player.PlayerScreen
 import com.hh.music.player.ui.playlist.PlaylistScreen
 import com.hh.music.player.ui.playlist.ToplistScreen
+import com.hh.music.player.ui.plaza.PlazaScreen
 import com.hh.music.player.ui.search.SearchScreen
 
 object Routes {
@@ -47,11 +50,14 @@ object Routes {
     const val SETTINGS = "settings"
     const val PLAYLIST = "playlist/{id}"
     const val ARTIST = "artist/{id}/{name}"
+    const val ALBUM = "album/{id}"
+    const val PLAZA = "plaza"
     const val PLAYER = "player"
 
     fun playlist(id: Long) = "playlist/$id"
     fun search(keyword: String = "") = "search?keyword=${Uri.encode(keyword)}"
     fun artist(id: Long, name: String) = "artist/$id/${Uri.encode(name)}"
+    fun album(id: Long) = "album/$id"
 }
 
 /** Provides the app-wide player controller to composables. */
@@ -74,6 +80,11 @@ val LocalEqualizerController = compositionLocalOf<EqualizerController> {
     error("EqualizerController not provided")
 }
 
+/** Best-effort cloud favorite sync (no-op when not logged in / backend mode). */
+val LocalCloudSync = compositionLocalOf<com.hh.music.player.data.CloudSync> {
+    error("CloudSync not provided")
+}
+
 private data class TabItem(val route: String, val label: String, val icon: @Composable () -> Unit)
 
 @Composable
@@ -94,7 +105,8 @@ fun HHMusicNavHost(container: AppContainer) {
         LocalPlayerController provides container.playerController,
         LocalStoreProvider provides container.localStore,
         LocalDownloadManager provides container.downloadManager,
-        LocalEqualizerController provides container.equalizerController
+        LocalEqualizerController provides container.equalizerController,
+        LocalCloudSync provides container.cloudSync
     ) {
     NavigationSuiteScaffold(
         navigationSuiteItems = {
@@ -114,7 +126,8 @@ fun HHMusicNavHost(container: AppContainer) {
                 )
             }
         },
-        layoutType = NavigationSuiteType.NavigationBar,
+        // No explicit layoutType: NavigationSuiteScaffold adapts on its own —
+        // bottom bar on phones, navigation rail/drawer on tablets & desktops.
         navigationSuiteColors = NavigationSuiteDefaults.colors(
             navigationBarContainerColor = MaterialTheme.colorScheme.surfaceContainer
         )
@@ -125,9 +138,22 @@ fun HHMusicNavHost(container: AppContainer) {
             modifier = Modifier
         ) {
                 composable(Routes.DISCOVER) {
+                    val player = container.playerController
+                    val fmScope = rememberCoroutineScope()
                     DiscoverScreen(
                         repository = container.repository,
                         onOpenToplist = { navController.navigate(Routes.TOPLIST) },
+                        onOpenPlaza = { navController.navigate(Routes.PLAZA) },
+                        onPersonalFm = {
+                            fmScope.launch {
+                                container.repository.personalFm().onSuccess { songs ->
+                                    if (songs.isNotEmpty()) {
+                                        player.playQueue(songs, 0)
+                                        navController.navigate(Routes.PLAYER)
+                                    }
+                                }
+                            }
+                        },
                         onSearch = { kw -> navController.navigate(Routes.search(kw)) },
                         onOpenPlaylist = { id -> navController.navigate(Routes.playlist(id)) },
                         onOpenPlayer = { navController.navigate(Routes.PLAYER) }
@@ -161,7 +187,8 @@ fun HHMusicNavHost(container: AppContainer) {
                         artistName = name,
                         repository = container.repository,
                         onBack = { navController.popBackStack() },
-                        onOpenPlayer = { navController.navigate(Routes.PLAYER) }
+                        onOpenPlayer = { navController.navigate(Routes.PLAYER) },
+                        onOpenAlbum = { albumId -> navController.navigate(Routes.album(albumId)) }
                     )
                 }
                 composable(Routes.TOPLIST) {
@@ -170,6 +197,13 @@ fun HHMusicNavHost(container: AppContainer) {
                         onPlaylistClick = { id -> navController.navigate(Routes.playlist(id)) },
                         onBack = { navController.popBackStack() },
                         onOpenPlayer = { navController.navigate(Routes.PLAYER) }
+                    )
+                }
+                composable(Routes.PLAZA) {
+                    PlazaScreen(
+                        repository = container.repository,
+                        onBack = { navController.popBackStack() },
+                        onOpenPlaylist = { id -> navController.navigate(Routes.playlist(id)) }
                     )
                 }
                 composable(Routes.LIBRARY) {
@@ -195,6 +229,15 @@ fun HHMusicNavHost(container: AppContainer) {
                     val id = backStackEntry.arguments?.getString("id")?.toLongOrNull() ?: 0L
                     PlaylistScreen(
                         playlistId = id,
+                        repository = container.repository,
+                        onBack = { navController.popBackStack() },
+                        onOpenPlayer = { navController.navigate(Routes.PLAYER) }
+                    )
+                }
+                composable(Routes.ALBUM) { backStackEntry ->
+                    val id = backStackEntry.arguments?.getString("id")?.toLongOrNull() ?: 0L
+                    AlbumScreen(
+                        albumId = id,
                         repository = container.repository,
                         onBack = { navController.popBackStack() },
                         onOpenPlayer = { navController.navigate(Routes.PLAYER) }

@@ -1,6 +1,5 @@
 package com.hh.music.player.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,11 +7,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ContainedLoadingIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -20,20 +19,23 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
-/** Centered loading spinner. */
+/** Centered M3E contained loading indicator (morphing shapes). */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun LoadingState(modifier: Modifier = Modifier) {
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
+        ContainedLoadingIndicator()
     }
 }
 
-/** Consistent empty state: icon in a tinted circle + hint text, optional action. */
+/**
+ * Consistent empty state: icon inside an expressive MaterialShapes container
+ * + hint text, optional action.
+ */
 @Composable
 fun EmptyState(
     hint: String,
@@ -47,15 +49,12 @@ fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Box(
-            Modifier
-                .size(72.dp)
-                .clip(MaterialTheme.shapes.extraLarge)
-                .background(MaterialTheme.colorScheme.secondaryContainer),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(32.dp))
-        }
+        ShapeBadge(
+            icon = icon,
+            shape = BadgeShapes.Clover,
+            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
         Spacer(Modifier.height(14.dp))
         Text(
             hint,
@@ -83,11 +82,11 @@ fun ErrorState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(
-            Icons.Filled.ErrorOutline,
-            contentDescription = null,
-            modifier = Modifier.size(48.dp),
-            tint = MaterialTheme.colorScheme.error
+        ShapeBadge(
+            icon = Icons.Filled.ErrorOutline,
+            shape = BadgeShapes.Burst,
+            tint = MaterialTheme.colorScheme.error,
+            containerColor = MaterialTheme.colorScheme.errorContainer
         )
         Spacer(Modifier.height(12.dp))
         Text(
