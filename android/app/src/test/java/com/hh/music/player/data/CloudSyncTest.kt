@@ -32,7 +32,7 @@ class CloudSyncTest {
 
     @Test
     fun `synthetic negative import ids are never pushed to the cloud`() {
-        val cloud = emptyList()
+        val cloud = emptyList<Song>()
         val local = listOf(song(-5), song(-6), song(7))
 
         val plan = CloudSync.planReconciliation(cloud, local)
@@ -42,7 +42,7 @@ class CloudSyncTest {
 
     @Test
     fun `push budget caps the cloud traffic of one login`() {
-        val cloud = emptyList()
+        val cloud = emptyList<Song>()
         val local = (1L..250L).map { song(it) }
 
         val plan = CloudSync.planReconciliation(cloud, local)
