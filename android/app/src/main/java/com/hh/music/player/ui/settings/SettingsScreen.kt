@@ -215,7 +215,7 @@ fun SettingsScreen(
                         }
                     }
                     Spacer(Modifier.height(12.dp))
-                    // 界面风格:经典 / Kanade(Kanade 式连贯转场与细节打磨)
+                    // 界面风格: 经典 / Kanade / Miuix
                     Text(
                         "界面风格",
                         style = MaterialTheme.typography.labelLarge,
@@ -225,17 +225,25 @@ fun SettingsScreen(
                         SegmentedButton(
                             selected = uiStyle == "classic",
                             onClick = { vm.setUiStyle("classic") },
-                            shape = SegmentedButtonDefaults.itemShape(0, 2)
+                            shape = SegmentedButtonDefaults.itemShape(0, 3)
                         ) { Text("经典") }
                         SegmentedButton(
                             selected = uiStyle == "kanade",
                             onClick = { vm.setUiStyle("kanade") },
-                            shape = SegmentedButtonDefaults.itemShape(1, 2)
+                            shape = SegmentedButtonDefaults.itemShape(1, 3)
                         ) { Text("Kanade") }
+                        SegmentedButton(
+                            selected = uiStyle == "miuix",
+                            onClick = { vm.setUiStyle("miuix") },
+                            shape = SegmentedButtonDefaults.itemShape(2, 3)
+                        ) { Text("Miuix") }
                     }
                     Text(
-                        if (uiStyle == "kanade") "页面切换使用连贯的淡入滑动动画"
-                        else "使用系统默认页面切换",
+                        when (uiStyle) {
+                            "kanade" -> "页面切换使用连贯的淡入滑动动画"
+                            "miuix" -> "使用小米 HyperOS 设计风格界面"
+                            else -> "使用系统默认页面切换"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 6.dp)

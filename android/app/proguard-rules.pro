@@ -29,3 +29,6 @@
 # OkHttp (ships its own consumer rules; keep just in case)
 -dontwarn okhttp3.**
 -dontwarn okio.**
+
+# Miuix UI
+-dontwarn top.yukonga.miuix.kmp.**

@@ -42,6 +42,7 @@ import com.hh.music.player.ui.playlist.PlaylistScreen
 import com.hh.music.player.ui.playlist.ToplistScreen
 import com.hh.music.player.ui.plaza.PlazaScreen
 import com.hh.music.player.ui.search.SearchScreen
+import com.hh.music.player.ui.miuix.navigation.MiuixNavHost
 
 object Routes {
     const val DISCOVER = "discover"
@@ -91,6 +92,14 @@ private data class TabItem(val route: String, val label: String, val icon: @Comp
 
 @Composable
 fun HHMusicNavHost(container: AppContainer) {
+    val uiStyle by container.localStore.uiStyle.collectAsState(initial = "classic")
+    
+    // If miuix style is selected, use the miuix navigation host
+    if (uiStyle == "miuix") {
+        MiuixNavHost(container)
+        return
+    }
+    
     val navController: NavHostController = rememberNavController()
     val tabs = listOf(
         TabItem(Routes.DISCOVER, "首页") { Icon(Icons.Filled.Home, contentDescription = null) },

@@ -6,6 +6,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -16,6 +17,7 @@ import com.hh.music.player.ui.HHMusicNavHost
 import com.hh.music.player.ui.theme.AppThemeColor
 import com.hh.music.player.ui.theme.AppThemeMode
 import com.hh.music.player.ui.theme.HHMusicTheme
+import com.hh.music.player.ui.theme.MiuixThemeWrapper
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -27,10 +29,11 @@ class MainActivity : ComponentActivity() {
             val themeMode by store.themeMode.collectAsState(initial = AppThemeMode.SYSTEM.key)
             val themeColor by store.themeColor.collectAsState(initial = AppThemeColor.GREEN.key)
             val dynamicColor by store.dynamicColor.collectAsState(initial = true)
+            val uiStyle by store.uiStyle.collectAsState(initial = "classic")
             val resolvedMode = AppThemeMode.from(themeMode)
             val resolvedColor = AppThemeColor.from(themeColor)
             val darkTheme = when (resolvedMode) {
-                AppThemeMode.SYSTEM -> androidx.compose.foundation.isSystemInDarkTheme()
+                AppThemeMode.SYSTEM -> isSystemInDarkTheme()
                 AppThemeMode.LIGHT -> false
                 AppThemeMode.DARK -> true
             }
@@ -49,16 +52,22 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
-            HHMusicTheme(
-                themeMode = resolvedMode,
-                themeColor = resolvedColor,
-                dynamicColor = dynamicColor
-            ) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
+            if (uiStyle == "miuix") {
+                MiuixThemeWrapper(themeMode = resolvedMode) {
                     HHMusicNavHost(app.container)
+                }
+            } else {
+                HHMusicTheme(
+                    themeMode = resolvedMode,
+                    themeColor = resolvedColor,
+                    dynamicColor = dynamicColor
+                ) {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        HHMusicNavHost(app.container)
+                    }
                 }
             }
         }
