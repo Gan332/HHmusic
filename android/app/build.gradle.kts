@@ -95,6 +95,6 @@ dependencies {
     implementation("com.google.zxing:core:3.5.3")
 
     // Miuix UI (Xiaomi HyperOS design language)
-    implementation("top.yukonga.miuix.kmp:miuix-ui-android:0.8.8")
-    implementation("top.yukonga.miuix.kmp:miuix-preference-android:0.8.8")
+    implementation("top.yukonga.miuix.kmp:miuix-ui-android:0.9.3")
+    implementation("top.yukonga.miuix.kmp:miuix-preference-android:0.9.3")
 }
