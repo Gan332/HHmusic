@@ -85,10 +85,23 @@ class PlaybackService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
         mediaSession
 
-    /** Load album art from URI and attach as [MediaMetadata.artworkData] on the current item. */
+    /**
+     * Load album art from URI and attach as [MediaMetadata.artworkData] on the
+     * current item. Skips if the current item already has artwork attached, to
+     * avoid racing with the PlayerController's URL hot-swap (which preserves
+     * existing artworkData on its end).
+     */
     private fun loadAndAttachArtwork(uri: Uri?, player: Player) {
         artworkJob?.cancel()
         if (uri == null || !uri.toString().startsWith("http")) return
+
+        val idx = player.currentMediaItemIndex
+        if (idx !in 0 until player.mediaItemCount) return
+        val current = player.getMediaItemAt(idx)
+        // Re-read here: the controller may have already replaced the item to
+        // back-fill the real URI. If artworkData is already present, our
+        // previous attempt finished and we shouldn't redo it.
+        if (current.mediaMetadata.artworkData != null) return
 
         artworkJob = serviceScope.launch {
             val bytes = withContext(Dispatchers.IO) {
@@ -111,18 +124,23 @@ class PlaybackService : MediaSessionService() {
                 } catch (_: Exception) { bytes }
             }
 
-            val idx = player.currentMediaItemIndex
-            if (idx in 0 until player.mediaItemCount) {
-                val current = player.getMediaItemAt(idx)
-                val updated = current.buildUpon()
-                    .setMediaMetadata(
-                        current.mediaMetadata.buildUpon()
-                            .setArtworkData(compressed, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
-                            .build()
-                    )
-                    .build()
-                player.replaceMediaItem(idx, updated)
-            }
+            // Re-check after the network round-trip: the controller may have
+            // replaced this slot to back-fill the URL and preserved a previous
+            // artworkData; or another transition may have moved us off this
+            // item. Either way, only write if we're still on the same item
+            // and it still has no artwork.
+            val currentIdx = player.currentMediaItemIndex
+            if (currentIdx != idx) return@launch
+            val now = player.getMediaItemAt(currentIdx)
+            if (now.mediaMetadata.artworkData != null) return@launch
+            val updated = now.buildUpon()
+                .setMediaMetadata(
+                    now.mediaMetadata.buildUpon()
+                        .setArtworkData(compressed, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                        .build()
+                )
+                .build()
+            player.replaceMediaItem(currentIdx, updated)
         }
     }
 

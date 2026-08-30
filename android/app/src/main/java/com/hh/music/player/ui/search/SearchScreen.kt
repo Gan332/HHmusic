@@ -21,6 +21,7 @@ import com.hh.music.player.data.MusicRepository
 import com.hh.music.player.ui.LocalPlayerController
 import com.hh.music.player.ui.LocalStoreProvider
 import com.hh.music.player.ui.components.MiniPlayerBar
+import com.hh.music.player.ui.components.SongActionMenu
 import com.hh.music.player.ui.components.SongRow
 
 @Composable
@@ -105,7 +106,8 @@ fun SearchScreen(
                                 index = index,
                                 isActive = song.id == currentSong?.id,
                                 isPlaying = song.id == currentSong?.id && isPlaying,
-                                onClick = { playFrom(index) }
+                                onClick = { playFrom(index) },
+                                trailing = { SongActionMenu(player = player, song = song) }
                             )
                             HorizontalDivider()
                         }

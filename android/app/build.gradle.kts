@@ -78,5 +78,9 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.androidx.datastore.preferences)
 
+    // Miuix (HyperOS-style UI) — optional second skin; see [UiStyle] in LocalStore.
+    implementation(libs.miuix.ui.android)
+    implementation(libs.miuix.preference.android)
+
     debugImplementation(libs.androidx.ui.tooling)
 }

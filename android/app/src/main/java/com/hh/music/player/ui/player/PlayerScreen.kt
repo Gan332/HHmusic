@@ -43,6 +43,11 @@ fun PlayerScreen(
     val playMode by player.playMode.collectAsState()
     val lyricState by vm.state.collectAsState()
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val error by player.error.collectAsState()
+    LaunchedEffect(error) {
+        error?.let { snackbarHostState.showSnackbar(it) }
+    }
 
     val favorites by store.favorites.collectAsState(initial = emptyList())
     val isFav = song?.let { s -> favorites.any { it.id == s.id } } ?: false
@@ -74,7 +79,20 @@ fun PlayerScreen(
                     Text(song?.name ?: "未在播放", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
                     Text(song?.artistText ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                IconButton(onClick = { song?.let { scope.launch { store.toggleFavorite(it) } } }) {
+                IconButton(onClick = {
+                    val s = song ?: return@IconButton
+                    // Try to sync with NetEase first; if it fails (offline /
+                    // no cookie / rate-limited), still persist locally so the
+                    // user doesn't lose the tap.
+                    scope.launch {
+                        val liked = !favorites.any { it.id == s.id }
+                        val synced = repository.likeSong(s.id, liked).isSuccess
+                        store.toggleFavorite(s)
+                        if (!synced) {
+                            snackbarHostState.showSnackbar("已本地收藏，未同步到网易云")
+                        }
+                    }
+                }) {
                     Icon(
                         if (isFav) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                         contentDescription = "收藏",
@@ -147,7 +165,7 @@ fun PlayerScreen(
         }
 
         // Queue drawer overlay
-        if (showQueue) {
+                if (showQueue) {
             Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)) {
                 Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
                     Text("播放队列", style = MaterialTheme.typography.titleLarge)
@@ -158,7 +176,12 @@ fun PlayerScreen(
                                 song = s, index = index,
                                 isActive = s.id == song?.id,
                                 isPlaying = s.id == song?.id && isPlaying,
-                                onClick = { player.playAt(index) }
+                                onClick = { player.playAt(index) },
+                                trailing = {
+                                    IconButton(onClick = { player.removeFromQueue(index) }) {
+                                        Icon(Icons.Filled.Close, contentDescription = "从队列移除")
+                                    }
+                                }
                             )
                         }
                     }
@@ -166,6 +189,11 @@ fun PlayerScreen(
                 }
             }
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }
 

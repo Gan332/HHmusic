@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.hh.music.player.data.local.LocalStore
+import com.hh.music.player.ui.theme.UiStyle
 
 private val QUALITY_OPTIONS = listOf(
     "standard" to "标准 (128k)",
@@ -59,7 +60,9 @@ fun SettingsScreen(
     val dynamicColor by vm.dynamicColor.collectAsState()
     val themeColor by vm.themeColor.collectAsState()
     val waveProgress by vm.waveProgress.collectAsState()
+    val uiStyle by vm.uiStyle.collectAsState()
     var qualityMenuOpen by remember { mutableStateOf(false) }
+    var styleMenuOpen by remember { mutableStateOf(false) }
     var editingUrl by remember { mutableStateOf(false) }
     var draftUrl by remember(backendUrl) { mutableStateOf(backendUrl) }
 
@@ -157,6 +160,37 @@ fun SettingsScreen(
             // ---- 主题 ----
             Spacer(Modifier.height(8.dp))
             SectionLabel("主题")
+
+            // UI style switcher (Material3 ↔ Miuix). Persisted; the app reads
+            // it at the root and rebuilds the entire NavHost when it changes.
+            Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.medium) {
+                Row(
+                    Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("界面风格", fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                        Text(
+                            "切换 Material 3 与 MIUI 风格界面，切换后重启页面",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Box {
+                        TextButton(onClick = { styleMenuOpen = true }) {
+                            Text(UiStyle.from(uiStyle).displayName)
+                        }
+                        DropdownMenu(expanded = styleMenuOpen, onDismissRequest = { styleMenuOpen = false }) {
+                            UiStyle.entries.forEach { style ->
+                                DropdownMenuItem(
+                                    text = { Text(style.displayName) },
+                                    onClick = { vm.setUiStyle(style.key); styleMenuOpen = false }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
             Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.medium) {
                 Column(Modifier.padding(16.dp)) {
                     // Dark mode toggle

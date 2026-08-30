@@ -18,6 +18,7 @@ import com.hh.music.player.data.local.LocalStore
 import com.hh.music.player.ui.LocalPlayerController
 import com.hh.music.player.ui.LocalStoreProvider
 import com.hh.music.player.ui.components.MiniPlayerBar
+import com.hh.music.player.ui.components.SongActionMenu
 import com.hh.music.player.ui.components.SongRow
 
 /**
@@ -60,7 +61,8 @@ fun LibraryScreen(
                             song = song, index = index,
                             isActive = song.id == currentSong?.id,
                             isPlaying = song.id == currentSong?.id && isPlaying,
-                            onClick = { player.playQueue(favorites, index) }
+                            onClick = { player.playQueue(favorites, index) },
+                            trailing = { SongActionMenu(player = player, song = song) }
                         )
                         HorizontalDivider()
                     }
@@ -76,7 +78,8 @@ fun LibraryScreen(
                             song = song, index = index,
                             isActive = song.id == currentSong?.id,
                             isPlaying = song.id == currentSong?.id && isPlaying,
-                            onClick = { player.playQueue(recent, index) }
+                            onClick = { player.playQueue(recent, index) },
+                            trailing = { SongActionMenu(player = player, song = song) }
                         )
                         HorizontalDivider()
                     }

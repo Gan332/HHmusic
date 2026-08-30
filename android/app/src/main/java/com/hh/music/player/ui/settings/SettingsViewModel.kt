@@ -31,6 +31,9 @@ class SettingsViewModel(private val store: LocalStore) : ViewModel() {
     val waveProgress: StateFlow<Boolean> =
         store.waveProgress.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    val uiStyle: StateFlow<String> =
+        store.uiStyle.stateIn(viewModelScope, SharingStarted.Eagerly, "material")
+
     fun setUseBackend(value: Boolean) { viewModelScope.launch { store.setUseBackend(value) } }
     fun setAudioQuality(value: String) { viewModelScope.launch { store.setAudioQuality(value) } }
     fun setIsDarkTheme(value: Boolean) { viewModelScope.launch { store.setIsDarkTheme(value) } }
@@ -38,4 +41,5 @@ class SettingsViewModel(private val store: LocalStore) : ViewModel() {
     fun setDynamicColor(value: Boolean) { viewModelScope.launch { store.setDynamicColor(value) } }
     fun setThemeColor(value: String) { viewModelScope.launch { store.setThemeColor(value) } }
     fun setWaveProgress(value: Boolean) { viewModelScope.launch { store.setWaveProgress(value) } }
+    fun setUiStyle(value: String) { viewModelScope.launch { store.setUiStyle(value) } }
 }

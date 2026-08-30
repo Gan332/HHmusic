@@ -18,6 +18,7 @@ import com.hh.music.player.data.SavedPlaylist
 import com.hh.music.player.ui.LocalPlayerController
 import com.hh.music.player.ui.LocalStoreProvider
 import com.hh.music.player.ui.components.MiniPlayerBar
+import com.hh.music.player.ui.components.SongActionMenu
 import com.hh.music.player.ui.components.SongRow
 import kotlinx.coroutines.launch
 
@@ -97,7 +98,8 @@ fun PlaylistScreen(
                                 index = index,
                                 isActive = song.id == currentSong?.id,
                                 isPlaying = song.id == currentSong?.id && isPlaying,
-                                onClick = { playFrom(index) }
+                                onClick = { playFrom(index) },
+                                trailing = { SongActionMenu(player = player, song = song) }
                             )
                             HorizontalDivider()
                         }

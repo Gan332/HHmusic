@@ -69,6 +69,10 @@ class LocalStore(private val context: Context) {
     private val waveProgressKey = booleanPreferencesKey("wave_progress")
     val waveProgress: Flow<Boolean> = context.dataStore.data.map { it[waveProgressKey] ?: false }
 
+    // ---- UI style: Material3 default vs. Miuix (HyperOS) — independent skin ----
+    private val uiStyleKey = stringPreferencesKey("ui_style")
+    val uiStyle: Flow<String> = context.dataStore.data.map { it[uiStyleKey] ?: UiStyle.MATERIAL.key }
+
     // ---- Backend URL (customizable) ----
     private val backendUrlKey = stringPreferencesKey("backend_url")
     val backendUrl: Flow<String> = context.dataStore.data.map { it[backendUrlKey] ?: "http://10.0.2.2:3000/api/" }
@@ -124,6 +128,7 @@ class LocalStore(private val context: Context) {
     suspend fun setDynamicColor(value: Boolean) { context.dataStore.edit { it[dynamicColorKey] = value } }
     suspend fun setThemeColor(value: String) { context.dataStore.edit { it[themeColorKey] = value } }
     suspend fun setWaveProgress(value: Boolean) { context.dataStore.edit { it[waveProgressKey] = value } }
+    suspend fun setUiStyle(value: String) { context.dataStore.edit { it[uiStyleKey] = value } }
     suspend fun setPlayMode(mode: String) {
         context.dataStore.edit { it[playModeKey] = mode }
     }

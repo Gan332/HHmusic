@@ -23,7 +23,8 @@ fun SongRow(
     index: Int,
     isPlaying: Boolean = false,
     isActive: Boolean = false,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    trailing: @Composable (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -70,6 +71,10 @@ fun SongRow(
         }
 
         Spacer(Modifier.width(8.dp))
+        // Default trailing: equalizer when this row is the playing song,
+        // otherwise the formatted duration. The caller's `trailing` slot is
+        // *additive* (e.g. a More menu) and renders after this so neither
+        // ever disappears.
         if (isPlaying) {
             EqualizerBar(modifier = Modifier.size(width = 16.dp, height = 20.dp))
         } else {
@@ -79,6 +84,7 @@ fun SongRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+        trailing?.invoke()
     }
 }
 
