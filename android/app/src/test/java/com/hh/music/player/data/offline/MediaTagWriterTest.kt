@@ -8,6 +8,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.nio.file.Files
 
 /** v1.7: ID3v2.3 tag building for downloaded MP3s. */
 class MediaTagWriterTest {
@@ -79,7 +80,7 @@ class MediaTagWriterTest {
 
     @Test
     fun `writeId3v2 prepends tag and preserves audio bytes`() {
-        val dir = createTempDir()
+        val dir = Files.createTempDirectory("hh-tagtest").toFile()
         val file = File(dir, "42.mp3")
         val audio = ByteArray(2048) { (it % 251).toByte() }
         file.writeBytes(audio)
@@ -100,7 +101,7 @@ class MediaTagWriterTest {
 
     @Test
     fun `hasId3 detects existing tag`() {
-        val dir = createTempDir()
+        val dir = Files.createTempDirectory("hh-tagtest").toFile()
         val tagged = File(dir, "tagged.mp3")
         tagged.writeBytes(MediaTagWriter.buildId3v23(song()) + ByteArray(64))
         val plain = File(dir, "plain.mp3")
