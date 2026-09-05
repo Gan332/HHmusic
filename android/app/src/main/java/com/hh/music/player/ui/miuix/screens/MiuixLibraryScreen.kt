@@ -172,7 +172,7 @@ fun MiuixLibraryScreen(
                                         maxLines = 1
                                     )
                                     Text(
-                                        "${playlist.trackCount}首",
+                                        if (playlist.creator.isNotBlank()) playlist.creator else "云端歌单",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )

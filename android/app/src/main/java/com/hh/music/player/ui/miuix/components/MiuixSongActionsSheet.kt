@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -49,6 +50,7 @@ import kotlinx.coroutines.launch
  * 播放 / 下一首播放 / 加入队列 / 收藏 / 下载（本地歌曲隐藏下载）。
  * 业务逻辑与经典版 [com.hh.music.player.ui.components.SongActionsSheet] 一致。
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MiuixSongActionsSheet(
     song: Song?,

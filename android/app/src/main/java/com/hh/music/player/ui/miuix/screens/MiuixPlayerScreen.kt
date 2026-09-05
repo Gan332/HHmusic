@@ -36,10 +36,12 @@ import com.hh.music.player.data.MusicRepository
 import com.hh.music.player.data.Song
 import com.hh.music.player.playback.PlayMode
 import com.hh.music.player.ui.LocalPlayerController
+import com.hh.music.player.ui.LocalCloudSync
 import com.hh.music.player.ui.LocalStoreProvider
 import com.hh.music.player.ui.miuix.components.MiuixArtworkImage
 import com.hh.music.player.ui.player.PlayerViewModel
 import com.hh.music.player.ui.components.formatDuration
+import kotlinx.coroutines.launch
 
 @Composable
 fun MiuixPlayerScreen(
@@ -50,14 +52,18 @@ fun MiuixPlayerScreen(
 ) {
     val player = LocalPlayerController.current
     val store = LocalStoreProvider.current
+    val cloudSync = LocalCloudSync.current
+    val scope = rememberCoroutineScope()
     val song by player.currentSong.collectAsState()
     val isPlaying by player.isPlaying.collectAsState()
     val playMode by player.playMode.collectAsState()
-    val lyrics by player.currentLyrics.collectAsState()
-    val position by player.position.collectAsState()
-    val duration by player.duration.collectAsState()
+    val lyricState by vm.state.collectAsState()
+    val position by player.positionMs.collectAsState()
+    val duration by player.durationMs.collectAsState()
     val favorites by store.favorites.collectAsState(initial = emptyList())
     val isFav = song?.let { s -> favorites.any { it.id == s.id } } ?: false
+
+    LaunchedEffect(song?.id) { song?.id?.let { vm.loadLyric(it) } }
 
     val playModeIcon = when (playMode) {
         PlayMode.SEQUENCE -> Icons.Filled.Repeat
@@ -115,8 +121,12 @@ fun MiuixPlayerScreen(
                     )
                 }
                 IconButton(onClick = {
-                    song?.let { s ->
-                        vm.toggleFavorite(s)
+                    song?.let {
+                        val willLike = !isFav
+                        scope.launch {
+                            store.toggleFavorite(it)
+                            cloudSync.pushLike(it.id, willLike)
+                        }
                     }
                 }) {
                     Icon(
@@ -156,11 +166,11 @@ fun MiuixPlayerScreen(
             Spacer(Modifier.weight(1f))
 
             // Lyrics preview (if available)
-            if (lyrics.lines.isNotEmpty()) {
-                val currentLine = lyrics.currentLine(position)
-                if (currentLine != null) {
+            if (lyricState.lines.isNotEmpty()) {
+                val current = lyricState.lines.lastOrNull { it.timeMs <= position }
+                if (current != null) {
                     Text(
-                        currentLine.text,
+                        current.text,
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onBackground,
                         textAlign = TextAlign.Center,
@@ -177,7 +187,7 @@ fun MiuixPlayerScreen(
             Column(modifier = Modifier.fillMaxWidth()) {
                 Slider(
                     value = if (duration > 0) position.toFloat() / duration.toFloat() else 0f,
-                    onValueChange = { /* Handle seek */ },
+                    onValueChange = { player.seekTo((it * duration).toLong()) },
                     modifier = Modifier.fillMaxWidth(),
                     colors = SliderDefaults.colors(
                         thumbColor = MaterialTheme.colorScheme.primary,
@@ -209,7 +219,7 @@ fun MiuixPlayerScreen(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { player.togglePlayMode() }) {
+                IconButton(onClick = { player.cyclePlayMode() }) {
                     Icon(
                         playModeIcon,
                         contentDescription = "播放模式",
@@ -224,7 +234,7 @@ fun MiuixPlayerScreen(
                     )
                 }
                 FilledIconButton(
-                    onClick = { if (isPlaying) player.pause() else player.resume() },
+                    onClick = { player.togglePlayPause() },
                     modifier = Modifier.size(64.dp),
                     shape = CircleShape
                 ) {
@@ -239,13 +249,6 @@ fun MiuixPlayerScreen(
                         Icons.Filled.SkipNext,
                         contentDescription = "下一首",
                         modifier = Modifier.size(36.dp)
-                    )
-                }
-                IconButton(onClick = { player.toggleFavorite() }) {
-                    Icon(
-                        Icons.Filled.Favorite,
-                        contentDescription = "收藏",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

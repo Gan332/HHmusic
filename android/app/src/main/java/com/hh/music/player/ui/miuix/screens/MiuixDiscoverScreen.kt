@@ -35,6 +35,7 @@ import com.hh.music.player.ui.miuix.components.MiuixErrorState
 import com.hh.music.player.ui.miuix.components.MiuixLoadingState
 import com.hh.music.player.ui.miuix.components.MiuixMiniPlayerBar
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MiuixDiscoverScreen(
     repository: MusicRepository,

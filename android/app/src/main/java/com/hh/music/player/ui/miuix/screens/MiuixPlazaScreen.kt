@@ -164,6 +164,7 @@ private fun MiuixPlazaCard(pl: PlazaPlaylist, onClick: () -> Unit) {
     ) {
         MiuixArtworkImage(
             url = pl.picUrl.orEmpty(),
+            contentDescription = pl.name,
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)

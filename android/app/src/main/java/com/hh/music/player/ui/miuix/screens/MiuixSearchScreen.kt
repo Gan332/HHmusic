@@ -252,7 +252,7 @@ private fun SearchResultsList(
                                 modifier = Modifier.size(64.dp)
                             ) {
                                 com.hh.music.player.ui.miuix.components.MiuixArtworkImage(
-                                    url = artist.picUrl,
+                                    url = artist.picUrl.orEmpty(),
                                     contentDescription = null,
                                     modifier = Modifier.fillMaxSize()
                                 )
