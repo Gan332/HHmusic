@@ -8,6 +8,7 @@ import com.hh.music.player.network.NcmParser
 import com.hh.music.player.network.HHMusicApi
 import com.hh.music.player.network.NetworkModule
 import com.hh.music.player.network.RecommendPlaylistItem
+import com.hh.music.player.network.SubscribeBody
 import com.hh.music.player.network.ToplistResponse
 import kotlinx.coroutines.launch
 import com.hh.music.player.playback.PlayerController
@@ -15,6 +16,7 @@ import com.hh.music.player.playback.EqualizerController
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -47,7 +49,9 @@ class MusicRepository(
     // Small in-memory LRU caches: lyrics are re-opened every time you re-visit the
     // player screen, and search results are re-fetched on every keystroke debounce.
     private val lyricCache = LruCache<Long, Lyric>(30)
-    private val searchCache = LruCache<SearchCacheKey, SearchPage>(30)    private val plazaCache = LruCache<PlazaCacheKey, PlaylistPlazaPage>(20)
+    private val searchCache = LruCache<SearchCacheKey, SearchPage>(30)
+    private val plazaCache = LruCache<PlazaCacheKey, PlaylistPlazaPage>(20)
+    private val userPlaylistCache = LruCache<Long, List<UserPlaylist>>(4)
     // ---------------- direct (NetEase) implementations ----------------
 
     suspend fun search(keyword: String, limit: Int = 30, offset: Int = 0): Result<SearchPage> =
@@ -128,20 +132,35 @@ class MusicRepository(
      * Resolve a playable URL. Uses eapi for the official V1 endpoint and, if no
      * link is returned (common without a login cookie), falls back to the
      * public "outer url" — exactly Ncrust's strategy.
+     *
+     * Anonymous requests are frequently denied anything above standard quality,
+     * so when the configured level yields no URL we retry once at "standard"
+     * before giving up — this alone recovers playback for most logged-out users.
      */
     suspend fun songUrl(id: Long): Result<SongUrl> = runCatching {
         withContext(ioDispatcher) {
             if (useBackend) {
                 api.songUrl(id)
             } else {
-                val payload = mapOf<String, Any>(
-                    "ids" to JSONArray().put(id).toString(),
-                    "level" to audioQuality,
-                    "encodeType" to "flac"
-                )
-                val body = DirectNcmClient.eapiPost("song/enhance/player/url/v1", payload)
-                val dataArr = JSONObject(body).optJSONArray("data")
-                val first = dataArr?.optJSONObject(0)
+                // 免登录播放: no MUSIC_U → grab an anonymous device session once so
+                // standard-quality URLs resolve without an account.
+                if (!hasLoginCookie && DirectNcmClient.getCookie() == null) {
+                    DirectNcmClient.ensureAnonymousCookie()
+                }
+                val levels = linkedSetOf(audioQuality, "standard")
+                var first: JSONObject? = null
+                for (level in levels) {
+                    val payload = mapOf<String, Any>(
+                        "ids" to JSONArray().put(id).toString(),
+                        "level" to level,
+                        "encodeType" to "flac"
+                    )
+                    val body = DirectNcmClient.eapiPost("song/enhance/player/url/v1", payload)
+                    first = JSONObject(body).optJSONArray("data")?.optJSONObject(0)
+                    val candidate = first?.optString("url", "")
+                    if (!candidate.isNullOrEmpty()) break
+                    first = null
+                }
                 val url = first?.optString("url", "") ?: ""
                 SongUrl(
                     id = id,
@@ -404,6 +423,64 @@ class MusicRepository(
             }
         }
     }
+
+    // ---------------- v1.8: my cloud playlists ----------------
+
+    /**
+     * The logged-in user's cloud playlists (first row is usually the immutable
+     * "我喜欢的音乐" liked-songs list). Cached per uid; empty result is NOT cached
+     * so a transient upstream hiccup can be retried.
+     */
+    suspend fun userPlaylists(uid: Long): Result<List<UserPlaylist>> = runCatching {
+        withContext(ioDispatcher) {
+            userPlaylistCache[uid]?.let { return@withContext it }
+            val rows = if (useBackend) {
+                api.userPlaylists(uid).playlist.map {
+                    UserPlaylist(
+                        id = it.id,
+                        name = it.name,
+                        coverImgUrl = it.coverImgUrl,
+                        trackCount = it.trackCount,
+                        creator = it.creator,
+                        specialType = it.specialType
+                    )
+                }
+            } else {
+                NcmParser.userPlaylists(
+                    JSONObject(
+                        DirectNcmClient.apiPost(
+                            "user/playlist",
+                            mapOf(
+                                "uid" to uid.toString(),
+                                "limit" to "30",
+                                "offset" to "0",
+                                "includeVideo" to "true"
+                            )
+                        )
+                    )
+                )
+            }
+            if (rows.isNotEmpty()) userPlaylistCache[uid] = rows
+            rows
+        }
+    }
+
+    /** Cloud-subscribe (true) or unsubscribe (false) a playlist. t=1/2 per NetEase. */
+    suspend fun subscribePlaylist(id: Long, subscribe: Boolean): Result<Unit> = runCatching {
+        withContext(ioDispatcher) {
+            val code = if (useBackend) {
+                api.subscribePlaylist(SubscribeBody(id = id, t = if (subscribe) 1 else 2)).code
+            } else {
+                JSONObject(
+                    DirectNcmClient.apiPost(
+                        "playlist/subscribe",
+                        mapOf("id" to id.toString(), "t" to if (subscribe) "1" else "2")
+                    )
+                ).optInt("code", -1)
+            }
+            if (code != 200) throw Exception("云端歌单订阅失败 (code=$code)")
+        }
+    }
 }
 
 /** Cache key for search results: paging parameters are part of the identity. */
@@ -429,11 +506,11 @@ class AppContainer(context: Context) {
     val equalizerController: EqualizerController = EqualizerController(localStore)
     val playerController: PlayerController =
         PlayerController(context.applicationContext, repository, localStore, downloadManager)
-    val cloudSync: CloudSync = CloudSync(repository, scope)
+    // Application scope for settings collection; declared before its first user.
+    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
+    val cloudSync: CloudSync = CloudSync(repository, localStore, scope)
 
     // Keep the repository runtime flags in sync with persisted user settings.
-    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
-
     companion object {
         /**
          * Process-wide handle so [PlaybackService] (a separate Android component)
@@ -447,10 +524,25 @@ class AppContainer(context: Context) {
         scope.launch { localStore.useBackend.collect { repository.useBackend = it } }
         scope.launch { localStore.audioQuality.collect { repository.audioQuality = it } }
         // Restore the login session (MUSIC_U) and keep the flag in sync for CloudSync.
+        // A fresh (previously unseen) non-blank token triggers a one-shot favorites
+        // reconciliation — covers QR scan AND cookie-paste logins with zero UI wiring.
         scope.launch {
+            var previousToken = ""
             localStore.loginCookie.collect { token ->
                 DirectNcmClient.setCookie(token.takeIf { it.isNotBlank() }?.let { "MUSIC_U=$it" })
                 repository.hasLoginCookie = token.isNotBlank()
+                if (token.isNotBlank() && token != previousToken) {
+                    val uid = localStore.userId.firstOrNull()
+                    if (uid != null && uid > 0) {
+                        cloudSync.reconcileFavorites(uid)?.let { r ->
+                            android.util.Log.i(
+                                "HHMusicSync",
+                                "favorites reconciled: +${r.cloudAddedLocally} local, ${r.pushedToCloud} pushed, ${r.cloudPushFailures} failed"
+                            )
+                        }
+                    }
+                }
+                previousToken = token
             }
         }
     }

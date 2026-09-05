@@ -10,9 +10,11 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaul
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.animation.core.tween
 import kotlinx.coroutines.launch
 
 import androidx.compose.ui.Modifier
@@ -40,6 +42,7 @@ import com.hh.music.player.ui.playlist.PlaylistScreen
 import com.hh.music.player.ui.playlist.ToplistScreen
 import com.hh.music.player.ui.plaza.PlazaScreen
 import com.hh.music.player.ui.search.SearchScreen
+import com.hh.music.player.ui.miuix.navigation.MiuixNavHost
 
 object Routes {
     const val DISCOVER = "discover"
@@ -89,6 +92,14 @@ private data class TabItem(val route: String, val label: String, val icon: @Comp
 
 @Composable
 fun HHMusicNavHost(container: AppContainer) {
+    val uiStyle by container.localStore.uiStyle.collectAsState(initial = "classic")
+    
+    // If miuix style is selected, use the miuix navigation host
+    if (uiStyle == "miuix") {
+        MiuixNavHost(container)
+        return
+    }
+    
     val navController: NavHostController = rememberNavController()
     val tabs = listOf(
         TabItem(Routes.DISCOVER, "首页") { Icon(Icons.Filled.Home, contentDescription = null) },
@@ -114,7 +125,11 @@ fun HHMusicNavHost(container: AppContainer) {
                 item(
                     selected = currentRoute == tab.route,
                     onClick = {
-                        navController.navigate(tab.route) {
+                        // SEARCH's route pattern carries "{keyword}"; navigating the raw
+                        // pattern would fill the arg with that literal text. Always go
+                        // through Routes.search() so the query starts empty.
+                        val route = if (tab.route == Routes.SEARCH) Routes.search() else tab.route
+                        navController.navigate(route) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true
                             restoreState = true
@@ -132,10 +147,41 @@ fun HHMusicNavHost(container: AppContainer) {
             navigationBarContainerColor = MaterialTheme.colorScheme.surfaceContainer
         )
     ) {
+        // "kanade" style: coherent fade+slide transitions on every route change,
+        // inspired by the Kanade client's fluid page switching. Classic keeps the
+        // platform default (no explicit transitions).
+        val uiStyle by container.localStore.uiStyle.collectAsState(initial = "classic")
+        val kanade = uiStyle == "kanade"
+        val kanadeSpec = tween<androidx.compose.ui.unit.IntOffset>(260, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+        val kanadeFade = tween<Float>(260)
         NavHost(
             navController = navController,
             startDestination = Routes.DISCOVER,
-            modifier = Modifier
+            modifier = Modifier,
+            enterTransition = {
+                if (kanade) {
+                    androidx.compose.animation.fadeIn(kanadeFade) +
+                        androidx.compose.animation.slideInHorizontally(kanadeSpec) { it / 8 }
+                } else androidx.compose.animation.EnterTransition.None
+            },
+            exitTransition = {
+                if (kanade) {
+                    androidx.compose.animation.fadeOut(kanadeFade) +
+                        androidx.compose.animation.slideOutHorizontally(kanadeSpec) { -it / 10 }
+                } else androidx.compose.animation.ExitTransition.None
+            },
+            popEnterTransition = {
+                if (kanade) {
+                    androidx.compose.animation.fadeIn(kanadeFade) +
+                        androidx.compose.animation.slideInHorizontally(kanadeSpec) { -it / 8 }
+                } else androidx.compose.animation.EnterTransition.None
+            },
+            popExitTransition = {
+                if (kanade) {
+                    androidx.compose.animation.fadeOut(kanadeFade) +
+                        androidx.compose.animation.slideOutHorizontally(kanadeSpec) { it / 10 }
+                } else androidx.compose.animation.ExitTransition.None
+            }
         ) {
                 composable(Routes.DISCOVER) {
                     val player = container.playerController
@@ -216,7 +262,10 @@ fun HHMusicNavHost(container: AppContainer) {
                                 launchSingleTop = true
                                 restoreState = true
                             }
-                        }
+                        },
+                        onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                        repository = container.repository,
+                        cloudSync = container.cloudSync
                     )
                 }
                 composable(Routes.SETTINGS) {
@@ -231,7 +280,8 @@ fun HHMusicNavHost(container: AppContainer) {
                         playlistId = id,
                         repository = container.repository,
                         onBack = { navController.popBackStack() },
-                        onOpenPlayer = { navController.navigate(Routes.PLAYER) }
+                        onOpenPlayer = { navController.navigate(Routes.PLAYER) },
+                        cloudSync = container.cloudSync
                     )
                 }
                 composable(Routes.ALBUM) { backStackEntry ->
