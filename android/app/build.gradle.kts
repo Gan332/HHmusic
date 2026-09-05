@@ -7,10 +7,10 @@ plugins {
 
 android {
     namespace = "com.hh.music.player"
-    // 37: miuix 0.9.3 artifacts (and androidx.navigationevent 1.1.2) declare
-    // minCompileSdk 37/36 via AAR metadata. targetSdk stays 35 — raising
-    // compileSdk only affects build-time API visibility, not runtime behavior.
-    compileSdk = 37
+    // 36: miuix-android 0.8.8 (latest usable with the runner SDK — Google only
+    // publishes up to platforms;android-36; the 0.9.x split artifacts require
+    // compileSdk 37 which does not exist). targetSdk stays 35.
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.hh.music.player"
@@ -97,7 +97,8 @@ dependencies {
     // QR rendering for NetEase login (core only — no camera/scanner)
     implementation("com.google.zxing:core:3.5.3")
 
-    // Miuix UI (Xiaomi HyperOS design language)
-    implementation("top.yukonga.miuix.kmp:miuix-ui-android:0.9.3")
-    implementation("top.yukonga.miuix.kmp:miuix-preference-android:0.9.3")
+    // Miuix UI (Xiaomi HyperOS design language). 0.8.8 is the last single
+    // artifact with the top.yukonga.miuix.kmp.theme API; 0.9.x split artifacts
+    // require compileSdk 37 (not published). Only the theme is used here.
+    implementation("top.yukonga.miuix.kmp:miuix-android:0.8.8")
 }

@@ -134,9 +134,9 @@ jobs:
 
             echo "Accepting licenses..."
             yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses --sdk_root="$SDK_ROOT" || true
-            echo "Installing platforms;android-35 platforms;android-37 build-tools;35.0.0 ..."
+            echo "Installing platforms;android-35 platforms;android-36 build-tools;35.0.0 ..."
             yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
-              "platforms;android-35" "platforms;android-37" "build-tools;35.0.0" --sdk_root="$SDK_ROOT" || true
+              "platforms;android-35" "platforms;android-36" "build-tools;35.0.0" --sdk_root="$SDK_ROOT" || true
           else
             echo "Using pre-installed SDK at $SDK_ROOT"
           fi
