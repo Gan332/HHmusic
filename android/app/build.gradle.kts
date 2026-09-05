@@ -37,9 +37,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     buildFeatures {
         compose = true
         buildConfig = true
@@ -53,6 +50,13 @@ android {
     // lint analysis); release step in CI is only for R8 verification, so skip lint there.
     lint {
         checkReleaseBuilds = false
+    }
+}
+
+// Kotlin 2.3 removed the String-based `kotlinOptions.jvmTarget`; use the typed DSL.
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
