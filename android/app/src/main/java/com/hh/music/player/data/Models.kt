@@ -190,17 +190,3 @@ data class PlazaCategory(
     val id: Int = 0,
     val name: String = ""
 )
-
-/** v1.8: one playlist row from the logged-in user's own cloud playlist list. */
-@Serializable
-data class UserPlaylist(
-    val id: Long = 0,
-    val name: String = "",
-    @SerialName("coverImgUrl") val coverImgUrl: String? = null,
-    val trackCount: Int = 0,
-    val creator: Creator? = null,
-    /** NetEase specialType 5 marks the immutable "我喜欢的音乐" liked-songs list. */
-    val specialType: Int = 0
-) {
-    val isLikedSongs: Boolean get() = specialType == 5
-}

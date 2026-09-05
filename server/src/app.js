@@ -19,8 +19,6 @@ import {
   getPlaylistCatlist,
   getTopPlaylists,
   getPersonalFm,
-  getUserPlaylists,
-  subscribePlaylist,
   likeSong,
   pingUpstream,
 } from "./netease.js";
@@ -55,8 +53,6 @@ export function createApp(deps = {}) {
     getPlaylistCatlist,
     getTopPlaylists,
     getPersonalFm,
-    getUserPlaylists,
-    subscribePlaylist,
     likeSong,
     ...deps,
   };
@@ -448,45 +444,6 @@ export function createApp(deps = {}) {
         status: 200,
         data: { code: 200, songs: normalizeSongsFrom(r.data?.data) },
       });
-    })
-  );
-
-  // v1.8: the logged-in user's cloud playlists (session rides the MUSIC_U
-  // cookie forwarded by the client). specialType 5 = "我喜欢的音乐".
-  app.get(
-    "/api/user/playlists",
-    asyncHandler(async (req, res) => {
-      const uid = toInt(req.query.uid, 0);
-      if (!uid) return res.status(400).json({ code: 400, msg: "missing uid" });
-      const limit = limitParam(req.query.limit, 30);
-      const offset = Math.max(0, toInt(req.query.offset, 0));
-      const r = await api.getUserPlaylists(uid, limit, offset);
-      const playlists = (r.data?.playlist ?? []).map((p) => ({
-        id: p.id,
-        name: p.name,
-        coverImgUrl: p.coverImgUrl ?? null,
-        trackCount: p.trackCount ?? 0,
-        creator: p.creator
-          ? { id: p.creator.userId ?? p.creator.id, nickname: p.creator.nickname }
-          : null,
-        specialType: p.specialType ?? 0,
-      }));
-      sendResult(res, { status: 200, data: { code: 200, playlists } });
-    })
-  );
-
-  // v1.8: cloud playlist subscribe (t=1) / unsubscribe (t=2).
-  app.post(
-    "/api/playlist/subscribe",
-    asyncHandler(async (req, res) => {
-      const id = toInt(req.body?.id, 0);
-      if (!id) return res.status(400).json({ code: 400, msg: "missing id" });
-      const t = toInt(req.body?.t, 1);
-      if (t !== 1 && t !== 2) {
-        return res.status(400).json({ code: 400, msg: "t must be 1 or 2" });
-      }
-      const r = await api.subscribePlaylist(id, t);
-      sendResult(res, { status: 200, data: { code: 200, id, t, raw: r.data?.code } });
     })
   );
 

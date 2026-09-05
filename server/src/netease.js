@@ -192,27 +192,6 @@ export async function getPersonalFm() {
   return neteaseRequest("personalFm", {});
 }
 
-/* ----- v1.8: my cloud playlists ----- */
-
-/**
- * The logged-in user's playlists: weapi POST /weapi/user/playlist.
- * Requires the client's MUSIC_U cookie (forwarded by the request pipeline).
- * First row is usually the immutable "我喜欢的音乐" (specialType 5).
- */
-export async function getUserPlaylists(uid, limit = 30, offset = 0) {
-  return neteaseRequest("userPlaylist", {
-    uid,
-    limit,
-    offset,
-    includeVideo: true,
-  });
-}
-
-/** Subscribe/unsubscribe to a playlist: weapi POST /weapi/playlist/subscribe, t=1|2. */
-export async function subscribePlaylist(id, t = 1) {
-  return neteaseRequest("playlist/subscribe", { id, t });
-}
-
 /**
  * Cheap liveness probe against NetEase, used by GET /api/health. Does NOT
  * depend on the weapi signing machinery — a plain GET is enough to tell

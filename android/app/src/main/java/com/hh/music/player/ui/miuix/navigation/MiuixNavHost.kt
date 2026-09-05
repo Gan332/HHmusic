@@ -34,6 +34,11 @@ import com.hh.music.player.ui.miuix.screens.MiuixSearchScreen
 import com.hh.music.player.ui.miuix.screens.MiuixLibraryScreen
 import com.hh.music.player.ui.miuix.screens.MiuixPlayerScreen
 import com.hh.music.player.ui.miuix.screens.MiuixSettingsScreen
+import com.hh.music.player.ui.miuix.screens.MiuixToplistScreen
+import com.hh.music.player.ui.miuix.screens.MiuixPlazaScreen
+import com.hh.music.player.ui.miuix.screens.MiuixPlaylistScreen
+import com.hh.music.player.ui.miuix.screens.MiuixArtistScreen
+import com.hh.music.player.ui.miuix.screens.MiuixAlbumScreen
 
 @Composable
 fun MiuixNavHost(container: AppContainer) {
@@ -163,21 +168,34 @@ fun MiuixNavHost(container: AppContainer) {
                 }
 
                 composable(Routes.TOPLIST) {
-                    // Placeholder for toplist screen
-                    Text("排行榜 - 开发中")
+                    MiuixToplistScreen(
+                        repository = container.repository,
+                        onPlaylistClick = { id -> navController.navigate(Routes.playlist(id)) },
+                        onBack = { navController.popBackStack() },
+                        onOpenPlayer = { navController.navigate(Routes.PLAYER) }
+                    )
                 }
 
                 composable(Routes.PLAZA) {
-                    // Placeholder for plaza screen
-                    Text("歌单广场 - 开发中")
+                    MiuixPlazaScreen(
+                        repository = container.repository,
+                        onBack = { navController.popBackStack() },
+                        onOpenPlaylist = { id -> navController.navigate(Routes.playlist(id)) },
+                        onOpenPlayer = { navController.navigate(Routes.PLAYER) }
+                    )
                 }
 
                 composable(
                     route = Routes.PLAYLIST,
                     arguments = listOf(navArgument("id") { type = NavType.LongType })
                 ) { backStackEntry ->
-                    // Placeholder for playlist screen
-                    Text("歌单详情 - 开发中")
+                    MiuixPlaylistScreen(
+                        playlistId = backStackEntry.arguments?.getLong("id") ?: 0L,
+                        repository = container.repository,
+                        onBack = { navController.popBackStack() },
+                        onOpenPlayer = { navController.navigate(Routes.PLAYER) },
+                        cloudSync = container.cloudSync
+                    )
                 }
 
                 composable(
@@ -187,16 +205,26 @@ fun MiuixNavHost(container: AppContainer) {
                         navArgument("name") { type = NavType.StringType }
                     )
                 ) { backStackEntry ->
-                    // Placeholder for artist screen
-                    Text("歌手详情 - 开发中")
+                    MiuixArtistScreen(
+                        artistId = backStackEntry.arguments?.getLong("id") ?: 0L,
+                        artistName = backStackEntry.arguments?.getString("name").orEmpty(),
+                        repository = container.repository,
+                        onBack = { navController.popBackStack() },
+                        onOpenPlayer = { navController.navigate(Routes.PLAYER) },
+                        onOpenAlbum = { id -> navController.navigate(Routes.album(id)) }
+                    )
                 }
 
                 composable(
                     route = Routes.ALBUM,
                     arguments = listOf(navArgument("id") { type = NavType.LongType })
                 ) { backStackEntry ->
-                    // Placeholder for album screen
-                    Text("专辑详情 - 开发中")
+                    MiuixAlbumScreen(
+                        albumId = backStackEntry.arguments?.getLong("id") ?: 0L,
+                        repository = container.repository,
+                        onBack = { navController.popBackStack() },
+                        onOpenPlayer = { navController.navigate(Routes.PLAYER) }
+                    )
                 }
             }
         }

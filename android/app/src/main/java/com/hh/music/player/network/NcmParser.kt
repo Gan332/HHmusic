@@ -14,7 +14,6 @@ import com.hh.music.player.data.PlazaPlaylist
 import com.hh.music.player.data.SearchPage
 import com.hh.music.player.data.Song
 import com.hh.music.player.data.ToplistItem
-import com.hh.music.player.data.UserPlaylist
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -211,34 +210,5 @@ object NcmParser {
             if (ordered.none { it.name == name }) ordered += PlazaCategory(-1, name)
         }
         return ordered
-    }
-
-    // ---------------- v1.8: my cloud playlists ----------------
-
-    /**
-     * Parse `/user/playlist` → `{playlist: [...]}` into normalized rows.
-     * Defensive: missing/blank arrays yield an empty list; entries without a
-     * positive id are skipped. The first row is usually the immutable
-     * "我喜欢的音乐" liked-songs list (`specialType == 5`).
-     */
-    fun userPlaylists(root: JSONObject): List<UserPlaylist> {
-        val arr = root.optJSONArray("playlist") ?: return emptyList()
-        val out = ArrayList<UserPlaylist>(arr.length())
-        for (i in 0 until arr.length()) {
-            val p = arr.optJSONObject(i) ?: continue
-            val id = p.optLong("id", 0)
-            if (id <= 0) continue
-            out += UserPlaylist(
-                id = id,
-                name = p.optString("name", ""),
-                coverImgUrl = p.optString("coverImgUrl", null)?.takeIf { it.isNotBlank() && it != "null" },
-                trackCount = p.optInt("trackCount", 0),
-                creator = p.optJSONObject("creator")?.let {
-                    Creator(it.optLong("userId", it.optLong("id", 0)), it.optString("nickname", ""))
-                },
-                specialType = p.optInt("specialType", 0)
-            )
-        }
-        return out
     }
 }

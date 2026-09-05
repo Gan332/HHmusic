@@ -97,17 +97,6 @@ interface HHMusicApi {
     // ---- v1.7: personal FM ----
     @GET("personal/fm")
     suspend fun personalFm(): SongDetailResponse
-
-    // ---- v1.8: my cloud playlists ----
-    @GET("user/playlists")
-    suspend fun userPlaylists(
-        @Query("uid") uid: Long,
-        @Query("limit") limit: Int = 30,
-        @Query("offset") offset: Int = 0
-    ): UserPlaylistsResponse
-
-    @POST("playlist/subscribe")
-    suspend fun subscribePlaylist(@Body body: SubscribeBody): SubscribeResponse
 }
 
 @Serializable
@@ -118,37 +107,6 @@ data class LikeBody(val id: Long, val like: Boolean = true)
 
 @Serializable
 data class LikeResponse(val code: Int = 0, val id: Long = 0, val like: Boolean = true)
-
-// ---- v1.8: my cloud playlists ----
-
-@Serializable
-data class UserPlaylistsResponse(
-    val code: Int = 0,
-    val playlist: List<CloudUserPlaylistDto> = emptyList()
-)
-
-/**
- * Server-normalized row (mirrors the direct-mode parser output). `specialType`
- * 5 marks the immutable "我喜欢的音乐" liked-songs list.
- */
-@Serializable
-data class CloudUserPlaylistDto(
-    val id: Long = 0,
-    val name: String = "",
-    val coverImgUrl: String? = null,
-    val trackCount: Int = 0,
-    val creator: com.hh.music.player.data.Creator? = null,
-    val specialType: Int = 0
-) {
-    val isLikedSongs: Boolean get() = specialType == 5
-}
-
-/** t=1 subscribe, t=2 unsubscribe. */
-@Serializable
-data class SubscribeBody(val id: Long, val t: Int = 1)
-
-@Serializable
-data class SubscribeResponse(val code: Int = 0, val id: Long = 0)
 
 @Serializable
 data class RecommendPlaylistResponse(val code: Int = 0, val list: List<RecommendPlaylistItem> = emptyList())

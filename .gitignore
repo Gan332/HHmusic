@@ -29,4 +29,10 @@ dsh-fonts.zip
 # local DSH Desktop plugins (separate projects, developed alongside the app)
 dsh-typography/
 dsh-token-usage/
+dsh-plugin-session-delete/
 .pnpm-store/
+
+# local scratch / drafts (never commit)
+电梯.md
+tmp_fix.js
+tmp_fix.py

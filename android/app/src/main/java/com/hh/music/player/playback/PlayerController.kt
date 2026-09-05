@@ -853,16 +853,11 @@ private fun recordRecent(song: Song) {
                 val c = controller
                 val currentIdx = c?.currentMediaItemIndex ?: _currentIndex.value
                 if (_queue.value.getOrNull(currentIdx)?.id == song.id) {
-                    val baseMessage = result.exceptionOrNull()?.message
-                        ?.takeIf { it.isNotBlank() }
-                        ?: "无法获取播放地址（可能为会员或版权受限）"
-                    // Anonymous requests are the most common cause — point at login.
-                    val message = if (!repository.hasLoginCookie && !repository.useBackend) {
-                        "$baseMessage；登录网易云账号后可解锁更多可播音源（设置 → 账号）"
-                    } else baseMessage
                     emitPlaybackError(
                         song,
-                        message = message,
+                        message = result.exceptionOrNull()?.message
+                            ?.takeIf { it.isNotBlank() }
+                            ?: "无法获取播放地址（可能为会员或版权受限）",
                         category = FailureCategory.NO_URL
                     )
                 }

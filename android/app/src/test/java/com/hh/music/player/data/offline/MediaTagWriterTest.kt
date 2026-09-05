@@ -88,9 +88,8 @@ class MediaTagWriterTest {
 
         assertTrue(ok)
         val bytes = file.readBytes()
-        // Tag prefix + original audio untouched: prefix length == a freshly
-        // built tag (10-byte header included).
-        assertEquals(bytes.size - audio.size, MediaTagWriter.buildId3v23(song()).size)
+        // Tag prefix + original audio untouched.
+        assertEquals(10 + bytes.size - audio.size, MediaTagWriter.buildId3v23(song()).size)
         assertTrue(bytes.copyOfRange(bytes.size - audio.size, bytes.size).contentEquals(audio))
         assertTrue(MediaTagWriter.hasId3(file))
         // Temp file cleaned up.

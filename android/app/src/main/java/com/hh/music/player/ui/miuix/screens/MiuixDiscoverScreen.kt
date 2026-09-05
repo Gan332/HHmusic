@@ -29,10 +29,11 @@ import com.hh.music.player.data.MusicRepository
 import com.hh.music.player.data.Song
 import com.hh.music.player.network.RecommendPlaylistItem
 import com.hh.music.player.ui.LocalPlayerController
-import com.hh.music.player.ui.components.ErrorState
-import com.hh.music.player.ui.components.LoadingState
 import com.hh.music.player.ui.discover.DiscoverViewModel
 import com.hh.music.player.ui.miuix.components.MiuixArtworkImage
+import com.hh.music.player.ui.miuix.components.MiuixErrorState
+import com.hh.music.player.ui.miuix.components.MiuixLoadingState
+import com.hh.music.player.ui.miuix.components.MiuixMiniPlayerBar
 
 @Composable
 fun MiuixDiscoverScreen(
@@ -69,11 +70,14 @@ fun MiuixDiscoverScreen(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             )
+        },
+        bottomBar = {
+            MiuixMiniPlayerBar(player = player, onClick = onOpenPlayer)
         }
     ) { padding ->
         when {
-            state.allEmpty && state.recommend.loading -> LoadingState()
-            state.allEmpty && state.allFailed -> ErrorState("推荐加载失败，请检查网络", { vm.refresh(force = true) })
+            state.allEmpty && state.recommend.loading -> MiuixLoadingState()
+            state.allEmpty && state.allFailed -> MiuixErrorState("推荐加载失败，请检查网络", { vm.refresh(force = true) })
             else -> LazyColumn(Modifier.fillMaxSize().padding(padding)) {
                 item {
                     // 搜索入口

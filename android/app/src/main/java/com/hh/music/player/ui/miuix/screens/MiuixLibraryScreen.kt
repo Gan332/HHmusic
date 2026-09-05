@@ -22,8 +22,10 @@ import com.hh.music.player.data.Song
 import com.hh.music.player.data.local.LocalStore
 import com.hh.music.player.ui.LocalPlayerController
 import com.hh.music.player.ui.LocalStoreProvider
-import com.hh.music.player.ui.components.EmptyState
 import com.hh.music.player.ui.library.LibraryViewModel
+import com.hh.music.player.ui.miuix.components.MiuixEmptyState
+import com.hh.music.player.ui.miuix.components.MiuixMiniPlayerBar
+import com.hh.music.player.ui.miuix.components.MiuixSongActionsSheet
 import com.hh.music.player.ui.miuix.components.MiuixSongRow
 
 private enum class MiuixLibraryTab(val label: String) {
@@ -50,6 +52,7 @@ fun MiuixLibraryScreen(
     val currentSong by player.currentSong.collectAsState()
     val isPlaying by player.isPlaying.collectAsState()
     var tab by remember { mutableStateOf(MiuixLibraryTab.SONGS) }
+    var actionsSong by remember { mutableStateOf<Song?>(null) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -81,15 +84,18 @@ fun MiuixLibraryScreen(
                     }
                 }
             }
+        },
+        bottomBar = {
+            MiuixMiniPlayerBar(player = player, onClick = onOpenPlayer)
         }
     ) { padding ->
         when (tab) {
             MiuixLibraryTab.SONGS -> {
                 if (favorites.isEmpty()) {
-                    EmptyState(
+                    MiuixEmptyState(
                         hint = "还没有收藏歌曲",
                         icon = Icons.Filled.QueueMusic,
-                        actionLabel = "去发现",
+                        actionText = "去发现",
                         onAction = onOpenDiscover
                     )
                 } else {
@@ -101,7 +107,7 @@ fun MiuixLibraryScreen(
                                 isActive = song.id == currentSong?.id,
                                 isPlaying = song.id == currentSong?.id && isPlaying,
                                 onClick = { player.playQueue(favorites, index) },
-                                onLongClick = { }
+                                onLongClick = { actionsSong = song }
                             )
                         }
                     }
@@ -109,7 +115,7 @@ fun MiuixLibraryScreen(
             }
             MiuixLibraryTab.RECENT -> {
                 if (recent.isEmpty()) {
-                    EmptyState(
+                    MiuixEmptyState(
                         hint = "还没有播放记录",
                         icon = Icons.Filled.QueueMusic
                     )
@@ -121,7 +127,8 @@ fun MiuixLibraryScreen(
                                 index = index,
                                 isActive = song.id == currentSong?.id,
                                 isPlaying = song.id == currentSong?.id && isPlaying,
-                                onClick = { player.playQueue(recent, index) }
+                                onClick = { player.playQueue(recent, index) },
+                                onLongClick = { actionsSong = song }
                             )
                         }
                     }
@@ -129,10 +136,10 @@ fun MiuixLibraryScreen(
             }
             MiuixLibraryTab.PLAYLISTS -> {
                 if (savedPlaylists.isEmpty()) {
-                    EmptyState(
+                    MiuixEmptyState(
                         hint = "还没有收藏歌单",
                         icon = Icons.Filled.QueueMusic,
-                        actionLabel = "去发现",
+                        actionText = "去发现",
                         onAction = onOpenDiscover
                     )
                 } else {
@@ -177,4 +184,6 @@ fun MiuixLibraryScreen(
             }
         }
     }
+
+    MiuixSongActionsSheet(song = actionsSong, onDismiss = { actionsSong = null })
 }
