@@ -1,17 +1,11 @@
 package com.hh.music.player.ui.miuix.navigation
 
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -21,7 +15,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import android.net.Uri
 import com.hh.music.player.data.AppContainer
 import com.hh.music.player.ui.LocalPlayerController
 import com.hh.music.player.ui.LocalStoreProvider
@@ -55,13 +48,13 @@ fun MiuixNavHost(container: AppContainer) {
     ) {
         Scaffold(
             bottomBar = {
-                val tabs = listOf(
-                    Routes.DISCOVER to "首页",
-                    Routes.SEARCH to "发现",
-                    Routes.LIBRARY to "收藏",
-                    Routes.SETTINGS to "设置"
+                val bottomBarRoutes = setOf(
+                    Routes.DISCOVER,
+                    Routes.SEARCH,
+                    Routes.LIBRARY,
+                    Routes.SETTINGS
                 )
-                val showBottomBar = currentRoute in tabs.map { it.first } || 
+                val showBottomBar = currentRoute in bottomBarRoutes ||
                     currentRoute?.startsWith("search") == true ||
                     currentRoute?.startsWith("playlist") == true ||
                     currentRoute?.startsWith("artist") == true ||
@@ -71,34 +64,16 @@ fun MiuixNavHost(container: AppContainer) {
                     currentRoute == Routes.PLAYER
 
                 if (showBottomBar && currentRoute != Routes.PLAYER) {
-                    NavigationBar {
-                        tabs.forEach { (route, label) ->
-                            NavigationBarItem(
-                                selected = currentRoute == route,
-                                onClick = {
-                                    val navRoute = if (route == Routes.SEARCH) Routes.search() else route
-                                    navController.navigate(navRoute) {
-                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                },
-                                icon = {
-                                    Icon(
-                                        when (route) {
-                                            Routes.DISCOVER -> Icons.Filled.Home
-                                            Routes.SEARCH -> Icons.Filled.Explore
-                                            Routes.LIBRARY -> Icons.Filled.Favorite
-                                            Routes.SETTINGS -> Icons.Filled.Tune
-                                            else -> Icons.Filled.Home
-                                        },
-                                        contentDescription = null
-                                    )
-                                },
-                                label = { Text(label) }
-                            )
+                    MiuixBottomNavigation(
+                        currentRoute = currentRoute,
+                        onNavigate = { route ->
+                            navController.navigate(route) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         }
-                    }
+                    )
                 }
             }
         ) { innerPadding ->
