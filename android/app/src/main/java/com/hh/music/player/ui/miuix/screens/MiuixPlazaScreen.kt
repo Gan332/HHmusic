@@ -127,7 +127,7 @@ fun MiuixPlazaScreen(
                         MiuixLoadingState()
                     }
                 state.playlists.isEmpty() && state.error ->
-                    MiuixErrorState("歌单加载失败，请检查网络") { vm.refresh() }
+                    MiuixErrorState("歌单加载失败，请检查网络", onRetry = { vm.refresh() })
                 else -> LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
                     state = gridState,
