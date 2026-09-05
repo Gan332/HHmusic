@@ -7,7 +7,10 @@ plugins {
 
 android {
     namespace = "com.hh.music.player"
-    compileSdk = 35
+    // 37: miuix 0.9.3 artifacts (and androidx.navigationevent 1.1.2) declare
+    // minCompileSdk 37/36 via AAR metadata. targetSdk stays 35 — raising
+    // compileSdk only affects build-time API visibility, not runtime behavior.
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.hh.music.player"
