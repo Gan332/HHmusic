@@ -48,7 +48,7 @@ cd android
 .\gradlew.bat assembleRelease
 ```
 
-要求：JDK 17+、Android SDK 35、Android Studio 最新稳定版。
+要求：JDK 17+、Android SDK 36、Android Studio 最新稳定版。
 
 ### Server（可选）
 

@@ -12,7 +12,7 @@ The app can run without the server: v1.2+ uses direct NetEase eapi calls from th
 
 Account & cloud sync: `network/LoginClient.kt` implements QR-code login (poll codes 801/802/803, expiry 800). The session is only the `MUSIC_U` cookie, stored in `LocalStore` key `"login_cookie"` — no credentials are ever sent or saved. `data/CloudSync.kt` pushes favorite/unfavorite to the NetEase cloud best-effort: persist locally first, then fire-and-forget the cloud call and swallow all failures (offline, logged out, backend mode). Cloud state mirrors local intent and is never the source of truth; UI must never wait on a sync.
 
-Tech stack (Android): Jetpack Compose + Material 3 (adaptive navigation suite), Navigation Compose, Media3/ExoPlayer + Media3 Session for playback, Retrofit + OkHttp with kotlinx.serialization for networking, Coil for images, DataStore Preferences for persistence, ZXing core for QR rendering. Current release: `versionName = "1.6"` (`versionCode = 6`) in `android/app/build.gradle.kts`; bump both when cutting a release. Java/Kotlin target is 17; `compileSdk`/`targetSdk` are 35, `minSdk` 24.
+Tech stack (Android): Jetpack Compose + Material 3 (adaptive navigation suite), Navigation Compose, Media3/ExoPlayer + Media3 Session for playback, Retrofit + OkHttp with kotlinx.serialization for networking, Coil for images, DataStore Preferences for persistence, ZXing core for QR rendering. Current release: `versionName = "1.8"` (`versionCode = 8`) in `android/app/build.gradle.kts`; bump both when cutting a release. Java/Kotlin target is 17; `compileSdk` is 36 and `targetSdk` 35, `minSdk` 24. Toolchain: Gradle 8.14.3 wrapper, AGP 8.11.1, Kotlin 2.3.20 (miuix theme via `top.yukonga.miuix.kmp:miuix-android:0.8.8`).
 
 ## Build, Test, and Development Commands
 
@@ -38,11 +38,11 @@ cd android
 .\gradlew.bat assembleRelease                   # R8/release build verification
 ```
 
-On Windows use `.\gradlew.bat` (bash/macOS: `./gradlew`). Building requires JDK 17+ and Android SDK 35 (`minSdk` 24); on a fresh checkout Gradle needs a SDK location — create `android/local.properties` with `sdk.dir=...` or set `ANDROID_HOME` (CI generates `local.properties` itself).
+On Windows use `.\gradlew.bat` (bash/macOS: `./gradlew`). Building requires JDK 17+ and Android SDK 36 (`platforms;android-36`, `minSdk` 24); on a fresh checkout Gradle needs a SDK location — create `android/local.properties` with `sdk.dir=...` or set `ANDROID_HOME` (CI generates `local.properties` itself).
 
 ## Lint quirk (do not "fix")
 
-`app/build.gradle.kts` sets `lint { checkReleaseBuilds = false }` deliberately: AGP 8.7 lint is incompatible with Kotlin 2.1 (IncompatibleClassChangeError in lint analysis). The release build in CI exists only for R8 verification. Don't re-enable release lint without upgrading the toolchain.
+`app/build.gradle.kts` sets `lint { checkReleaseBuilds = false }` deliberately: lint analysis has historically been incompatible with this project's Kotlin/Compose setup, and lint is not part of CI anyway — the release build exists only for R8 verification. Don't re-enable release lint as part of unrelated changes.
 
 ## Coding Style & Naming Conventions
 
